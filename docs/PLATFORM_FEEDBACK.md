@@ -34,11 +34,11 @@ Until the verb exists, the README's clone instructions are the contract. When th
 
 # user register is interactive-only (agents cannot complete it)
 
-`raindb-cli user register` prompts for email + password interactively. An agent driving a shell cannot answer prompts; AGENTS.md Phase 0 currently tells the agent to hand this step to the user.
+RESOLVED ON VERIFICATION: `user register` DOES support headless flags (--email, --name, --password) -- the whole Phase 0 chain (register -> group create -> tenant create) ran non-interactively during the live walkthrough. The original note assumed prompts-only from the help text's prompt wording.
 
-Proposed: support flags/env (`--email`, `--password-stdin`) or a device-code flow so the whole Phase 0 chain is headless. The CLI-first principle in the github-connector guide (every browser-interactive step has a non-interactive CLI equivalent) should apply to signup too.
-
-Not verified whether flags already exist beyond the prompt path -- if they do, document them in `user register --help` examples and AGENTS.md can drop the hand-off.
+Two real issues remain (split out):
+1. The CLI ships with NO default portal URL: bare `user register` fails with "PortalURL is empty -- set --portal flag, RAINDB_PORTAL_URL env, or profile portal_url field". A fresh user must already know https://raindb.io is the portal. The CLI should default to https://raindb.io (production) so the documented first command works out of the box. (The help text even references the old devx portal as the default, which no longer resolves.)
+2. AGENTS.md + setup.sh now document the --portal flag in the Phase 0 chain as the workaround.
 
 # Profile endpoint + api_key only readable by parsing INI files
 
@@ -67,6 +67,43 @@ Related nicety: have `lightning bolt deploy` print the live URL on success -- th
 The template's scripts/deploy.sh self-heals or diagnoses, in order: missing CLI/node/git, missing or invalid profile (with the actual profile list from the INI and per-error-class fixes for 401 / unknown-profile / network), missing config files, unpublished formations (auto-publishes any local pair missing from the tenant), missing node_modules, missing client/dist on server-only deploys (bootstrap build), missing dist/main.js after build, deploy rejections classified by error text (401/403/timeout/entry/routes), missing or stale .bolt-url (rewrites), and a post-deploy /api/health probe with a wait-retry-status checklist when not 200.
 
 Everything in that list is the template compensating for the platform: each diagnosis branch is a candidate for a better CLI error message or a server-side preflight. The error-text classification (case patterns on CLI output) is brittle by nature -- typed exit codes or a structured error JSON from raindb-cli (-o json on failure) would let the script branch reliably instead of grepping prose.
+
+# Default chat model resolution fails on a fresh tenant (and the config seed contradicts the registry)
+
+Symptom: on a brand-new tenant (created via tenant create, nothing else), the starter's agent chat returned: "resolveDefaultChatModel: raindb registry has no model with chat capability (check platform-llm-model + platform-config-llm seeds)". Yet GET /v1/models with the same tenant key lists 10+ chat-capable models, and a direct POST /v1/chat/completions with model pinned works fine.
+
+Two distinct problems:
+1. Default-model RESOLUTION inside the agent loop fails on a fresh tenant even though the /v1 surface can serve chat. Whatever path resolveDefaultChatModel reads (platform-llm-model via by-id-latest per platform-config-llm) is not visible/seeded for a new tenant at creation time.
+2. The config seed contradicts the operator's intent and the registry: `config get llm` shows chat.defaultModel = fdn-internal/sonnet-4.6, but the cheap Amazon Nova model is supposed to be the default (and the registry flags fdn-internal/nova-lite as is_default for chat). Fresh tenants would silently default to the expensive model if resolution worked.
+
+Template mitigation (the reference-app pattern): pin the model explicitly -- CHAT_MODEL = "fdn-internal/nova-lite" in server/ai/chat.ts, passed as runAgent's model. joshua-vs-wopr (nova-micro) and crexp (sonnet-4.6) both do this.
+
+Platform fixes wanted: (a) make default-chat-model resolution work out of the box on a fresh tenant; (b) align platform-config-llm chat.defaultModel with the intended cheap Nova default; (c) make the resolver's error message say WHICH lookup failed (formation? index? empty registry?) so the fix is actionable without platform knowledge.
+
+# Payload field "author" is shadowed by the platform's write-author template variable
+
+Symptom: the starter's by-author index template used {{.author}} expecting the payload's author field. Index keys came out as .../by-author/bolt:<boltId>/... -- the WRITE AUTHOR (the writing principal) silently shadowed the payload field, so per-author filtering returned empty. No error at publish or write time.
+
+Fix applied in the template: payload field renamed authorName; gotcha #10 added to AGENTS.md (with the debugging signature: `raindb-cli droplet keys "indexes/<f>/<i>/"` showing bolt:... where your value should be).
+
+Platform fixes wanted, in order of value:
+1. formation publish should WARN (or reject) when an index template references a variable that collides with a platform-injected name (author, tenantId, dropletId, yyyy/mm/dd, ...).
+2. The patterns guide (raindb/guide-patterns pack) should list the reserved/injected template variables in the formation-config section -- it documents the date + id variables but never says `author` is injected.
+3. Document the full injected-variable list in `formation publish --help`.
+
+# End-to-end walkthrough verified (account -> tenant -> deploy -> browser)
+
+Full agent-path verification on production (raindb.io / api.raindb.io), 2026-06-13:
+
+1. user register --portal https://raindb.io --email/--name/--password: headless, worked.
+2. group create + tenant create: wrote profile core.prod.starter-demo with working key.
+3. scripts/setup.sh: formations published, LLM secrets staged, first deploy OK, hook installed. (Initial health probe failed only due to LOCAL resolver SERVFAIL on the fresh stormfront subdomain; resolved at 8.8.8.8 immediately -- DNS propagation, not platform.)
+4. Notes CRUD over the live bolt: create/list/filter all green after the authorName fix.
+5. Post-commit hook: server-only deploys fire automatically on commit, ~2 min, health-checked.
+6. Vite dev loop: npm run dev + /api proxy to live bolt + HMR verified in-browser (edit -> instant update, no reload, live data).
+7. AI chat: SSE frames (thinking / tool-call / final) render live; nova-lite + list_notes tool grounded answers; GFM tables render after remark-gfm + a system-prompt nudge to not fence markdown.
+
+The walkthrough cost ~25 minutes including all debugging -- with the friction items in this doc fixed it would be under 10.
 
 
 <!-- markdown-helper:v1
@@ -100,6 +137,10 @@ Everything in that list is the template compensating for the platform: each diag
       "state": "fixed",
       "title": "SDK git installs shipped no dist (no prepare script)"
     },
+    "E": {
+      "state": "fixed",
+      "title": "user register is interactive-only (agents cannot complete it)"
+    },
     "H": {
       "state": "proposed",
       "title": "Bolt URL discovery requires json parsing of bolt info"
@@ -107,6 +148,14 @@ Everything in that list is the template compensating for the platform: each diag
     "I": {
       "state": "fixed",
       "title": "deploy.sh hardening notes (what the template absorbs today)"
+    },
+    "K": {
+      "state": "fixed",
+      "title": "Payload field \"author\" is shadowed by the platform's write-author template variable"
+    },
+    "L": {
+      "state": "fixed",
+      "title": "End-to-end walkthrough verified (account -> tenant -> deploy -> browser)"
     }
   },
   "v": 1
