@@ -1,0 +1,75 @@
+:root {
+  color-scheme: dark;
+  --bg: #0d1117;
+  --panel: #161b22;
+  --border: #30363d;
+  --text: #e6edf3;
+  --muted: #8b949e;
+  --accent: #58a6ff;
+  --error: #f85149;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+}
+
+.shell { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+
+.header h1 { margin: 0 0 4px; font-size: 1.6rem; }
+.header p { margin: 0 0 24px; color: var(--muted); max-width: 70ch; }
+.header code { color: var(--accent); }
+
+.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 800px) { .columns { grid-template-columns: 1fr; } }
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  min-height: 480px;
+}
+.panel h2 { margin: 0 0 12px; font-size: 1.1rem; }
+
+input, textarea, button {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+button {
+  background: var(--accent);
+  color: #04111f;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+}
+button:disabled { opacity: 0.5; cursor: default; }
+
+.note-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+
+.notes { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+.note { border-top: 1px solid var(--border); padding: 10px 2px; }
+.note-head { display: flex; justify-content: space-between; gap: 8px; }
+.note p { margin: 6px 0; white-space: pre-wrap; }
+.meta { color: var(--muted); font-size: 0.85rem; }
+.error { color: var(--error); }
+
+.chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+.chat-line { padding: 8px 12px; border-radius: 8px; max-width: 90%; white-space: pre-wrap; }
+.chat-line.user { background: #1f3a5f; align-self: flex-end; }
+.chat-line.assistant { background: #21262d; align-self: flex-start; }
+.chat-line.activity { color: var(--muted); font-size: 0.85rem; padding: 0 4px; }
+.chat-line.error { color: var(--error); font-size: 0.9rem; }
+
+.chat-form { display: flex; gap: 8px; }
+.chat-form input { flex: 1; }

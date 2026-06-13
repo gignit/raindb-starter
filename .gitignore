@@ -1,0 +1,11 @@
+node_modules/
+dist/
+client/dist/
+client/node_modules/
+.bolt-url
+.deploy.log
+.setup-*.log
+*.log
+.env
+.env.local
+.DS_Store

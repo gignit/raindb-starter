@@ -1,0 +1,19 @@
+{
+  "block": [
+    { "path": "/.env",   "status": 404 },
+    { "path": "/.git/*", "status": 404 }
+  ],
+  "routes": [
+    { "method": "POST", "path": "/api/chat", "handler": "onHttpRequest", "streaming": true },
+
+    { "method": "GET",  "path": "/api/health",    "handler": "onHttpRequest" },
+    { "method": "GET",  "path": "/api/notes",     "handler": "onHttpRequest" },
+    { "method": "POST", "path": "/api/notes",     "handler": "onHttpRequest" },
+    { "method": "GET",  "path": "/api/notes/*",   "handler": "onHttpRequest" },
+    { "method": "POST", "path": "/api/notes/*",   "handler": "onHttpRequest" }
+  ],
+  "static": [
+    { "path": "/assets/*", "publicAsset": "assets/" },
+    { "path": "/*",        "publicAsset": "index.html" }
+  ]
+}

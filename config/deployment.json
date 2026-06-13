@@ -1,0 +1,9 @@
+{
+  "engine": "goja",
+  "entrypoint": "dist/main.js",
+  "mount": "/",
+  "healthcheck": "/api/health",
+  "stripPrefix": false,
+  "stickySession": false,
+  "websocket": false
+}

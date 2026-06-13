@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "starter-notes v1",
+  "description": "The starter's example entity: a note. Every write of the same noteId creates a NEW immutable droplet (a revision); the by-id-latest pointer index always resolves to the newest one. This is the canonical RainDB entity shape -- replace it with YOUR domain entity (a product, a post, a booking) when you build your app. There are no migrations: bump the schema version and publish.",
+  "type": "object",
+  "required": ["noteId", "author", "title", "body", "createdAt"],
+  "properties": {
+    "noteId":    { "type": "string", "minLength": 1, "description": "UUIDv7 -- doubles as chronological order." },
+    "author":    { "type": "string", "minLength": 1, "description": "Who wrote it. Indexed (by-author) so per-author listing is O(pageSize)." },
+    "title":     { "type": "string", "minLength": 1 },
+    "body":      { "type": "string" },
+    "tags":      { "type": "array", "items": { "type": "string" }, "description": "Free-form labels. Periscope SQL can filter on them." },
+    "createdAt": { "type": "string", "minLength": 1, "description": "ISO-8601. Display only; chronology comes from the UUIDv7 noteId." },
+    "updatedAt": { "type": ["string", "null"], "description": "ISO-8601 of the latest revision." }
+  },
+  "additionalProperties": true
+}

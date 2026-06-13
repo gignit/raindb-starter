@@ -1,0 +1,45 @@
+{
+  "configVersion": 1,
+  "formationId": "starter-notes",
+  "pathTemplate": "tenants/{{.tenantId}}/entities/starter-notes/{{.noteId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "scopeKey": "noteId",
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": ["v1"],
+  "indexes": [
+    {
+      "name": "by-id-latest",
+      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-id/{{.noteId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-author",
+      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-author/{{.author}}/{{.noteId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ],
+  "actions": [
+    { "action": "periscope-pool", "trigger": "onDroplet", "metadata": { "tier": "stream" } }
+  ],
+  "queryConfig": { "enabled": true, "flattenDepth": 1, "defaultLimit": 100, "maxLimit": 1000 },
+  "tierPolicy": {
+    "tiers": {
+      "stream": {
+        "enabled": true,
+        "source": { "type": "droplets", "index": "by-id-latest" },
+        "trigger": { "operator": "OR", "next": "*/5 * * * *", "tz": "UTC" },
+        "path": "tenants/{{.tenantId}}/periscope/{{.formationId}}/stream/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.poolId}}.parquet",
+        "retainInputs": true,
+        "retention": { "afterSupersession": "30d" }
+      }
+    },
+    "partition": { "strategy": "formation" },
+    "catalog": { "location": "tenants/{{.tenantId}}/periscope/{{.formationId}}/catalog" }
+  },
+  "views": {
+    "defaultBehavior": { "dedup": true },
+    "queryDefaults": { "autoPool": true, "window": "10s" }
+  }
+}

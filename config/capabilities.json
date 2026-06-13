@@ -1,0 +1,21 @@
+{
+  "raindb": {
+    "formations": [
+      { "id": "starter-notes", "ops": ["read", "write", "list"] }
+    ],
+    "secrets": {
+      "names": ["LLM_API_BASE", "LLM_API_KEY"]
+    }
+  },
+  "network": {
+    "egress": ["api.raindb.io", "raindb.io", "api.devx.raindb.gignit.com", "raindb.gignit.com"],
+    "fetch": {
+      "allowedHosts": ["api.raindb.io", "raindb.io", "api.devx.raindb.gignit.com", "raindb.gignit.com"]
+    }
+  },
+  "limits": {
+    "cpuMs": 10000,
+    "memoryMb": 128,
+    "wallMs": 60000
+  }
+}
