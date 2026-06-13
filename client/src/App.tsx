@@ -9,6 +9,16 @@
 // the SSE consumption pattern in ChatPanel are the parts worth keeping.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Markdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import "github-markdown-css/github-markdown-dark.css";
+
+// Shared renderer: GitHub-flavored markdown (tables, strikethrough, task
+// lists, autolinks) styled by github-markdown-css. Used for note bodies AND
+// assistant replies -- one markdown pipeline for the whole app.
+function Md({ children }: { children: string }) {
+  return <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>;
+}
 import { listNotes, createNote, streamChat, type Note, type ChatEvent } from "./api";
 
 export default function App() {
@@ -86,7 +96,11 @@ function NotesPanel() {
               <strong>{n.title}</strong>
               <span className="meta">{n.authorName}</span>
             </div>
-            {n.body && <p>{n.body}</p>}
+            {n.body && (
+              <div className="markdown-body note-body">
+                <Md>{n.body}</Md>
+              </div>
+            )}
             <span className="meta">{new Date(n.createdAt).toLocaleString()}</span>
           </li>
         ))}
@@ -157,8 +171,8 @@ function ChatPanel() {
           </p>
         )}
         {lines.map((l, i) => (
-          <div key={i} className={`chat-line ${l.kind}`}>
-            {l.text}
+          <div key={i} className={`chat-line ${l.kind}${l.kind === "assistant" ? " markdown-body" : ""}`}>
+            {l.kind === "assistant" ? <Md>{l.text}</Md> : l.text}
           </div>
         ))}
       </div>

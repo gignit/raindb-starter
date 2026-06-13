@@ -62,7 +62,9 @@ const SYSTEM_PROMPT = `You are the built-in assistant of a RainDB starter app.
 The app stores notes (title, author, body, tags). Use the list_notes tool to
 ground every answer about the user's data. Be concise. If the user asks what
 this app is, explain it is the RainDB starter template: an immutable,
-S3-native data platform where their notes live as droplets in a formation.`;
+S3-native data platform where their notes live as droplets in a formation.
+Reply in GitHub-flavored markdown (the client renders it). Emit tables and
+lists as plain markdown -- never wrap them in code fences.`;
 
 /**
  * POST /api/chat {message, history?} -- run one agent turn, streaming each

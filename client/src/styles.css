@@ -61,13 +61,22 @@ button:disabled { opacity: 0.5; cursor: default; }
 .note { border-top: 1px solid var(--border); padding: 10px 2px; }
 .note-head { display: flex; justify-content: space-between; gap: 8px; }
 .note p { margin: 6px 0; white-space: pre-wrap; }
+.note-body { margin: 6px 0; }
 .meta { color: var(--muted); font-size: 0.85rem; }
 .error { color: var(--error); }
 
 .chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
 .chat-line { padding: 8px 12px; border-radius: 8px; max-width: 90%; white-space: pre-wrap; }
 .chat-line.user { background: #1f3a5f; align-self: flex-end; }
-.chat-line.assistant { background: #21262d; align-self: flex-start; }
+.chat-line.assistant { background: #21262d; align-self: flex-start; white-space: normal; }
+
+/* github-markdown-css integration: the .markdown-body class (on note
+   bodies + assistant replies) gets GitHub's full markdown styling from
+   the package. Only override what must match our panels. */
+.markdown-body {
+  background: transparent;
+  font-size: 0.95rem;
+}
 .chat-line.activity { color: var(--muted); font-size: 0.85rem; padding: 0 4px; }
 .chat-line.error { color: var(--error); font-size: 0.9rem; }
 
