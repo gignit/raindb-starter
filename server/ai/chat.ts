@@ -25,6 +25,19 @@ import { runAgent, type AgentEvent, type RegisteredTool } from "@raindb/agent";
 import { readJsonBody } from "../lib/http.js";
 import { listAllNoteIds, readNotes } from "../lib/persistence.js";
 
+// Pin the model EXPLICITLY (the pattern every reference app follows --
+// e.g. joshua-vs-wopr pins fdn-internal/nova-micro). Omitting `model` makes
+// the agent loop resolve the tenant's default chat model, which can fail on
+// a fresh tenant before its model registry is seeded. Pinning skips
+// resolution entirely.
+//
+// Amazon Nova (via Bedrock, inference stays in your AWS account) is the
+// platform's intended default: cheap, fast, supports chat +
+// function-calling -- exactly what an app assistant needs. List the full
+// catalog with GET {LLM_API_BASE}/models and only reach for a bigger model
+// when Nova's reasoning is genuinely the bottleneck.
+export const CHAT_MODEL = "fdn-internal/nova-lite";
+
 function sseFrame(event: string, data: unknown): string {
   return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
 }
@@ -100,6 +113,7 @@ export async function handleChat(ctx: BoltContext, req: BoltRequest): Promise<Bo
         userId: "starter-user",
       },
       tools: [list_notes],
+      model: CHAT_MODEL,
       maxIterations: 6,
       onEvent: (e: AgentEvent) => emit(e.type, e),
     });
