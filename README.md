@@ -125,9 +125,17 @@ Replace `starter-notes` with your domain entity and you have your app.
   (games + LLM opponent + session continuity, the canonical deep
   reference), super-calculator (multi-tool agent UI), fdn-app
   (production RAG).
+- **The patterns guide** (read this before designing formations):
+  `raindb-cli pack install raindb/guide-patterns` installs the
+  definitive RainDB reference to
+  `~/.local/share/raindb/packs/raindb/guide-patterns/<version>/README.md`
+  -- indexes, access tiers, feeds, SQL, floats, and every common
+  mistake with its fix.
 - **Marketplace packs**: `raindb-cli pack list` -- prebuilt formation
   sets for auth (`raindb/user-auth-email`), social, media, finance,
-  real estate, and the full document-RAG stack (`raindb/foundation`).
+  real estate, and the full document-RAG stack (`raindb/foundation`);
+  install any of them with `raindb-cli pack install <name>` and copy
+  their working formation configs.
 - **The SDK guides**: [@raindb/bolt-sdk](https://github.com/gignit/raindb-bolt-sdk-ts)
   (every binding: db, secrets, jwt, crypto, IAM, SSE) and
   [@raindb/agent](https://github.com/gignit/raindb-agent-ts) (the

@@ -6,7 +6,8 @@
 
 export interface Note {
   noteId: string;
-  author: string;
+  /** Payload field is authorName ("author" is a platform-reserved template variable). */
+  authorName: string;
   title: string;
   body: string;
   tags?: string[];

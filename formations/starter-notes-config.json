@@ -15,7 +15,7 @@
     },
     {
       "name": "by-author",
-      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-author/{{.author}}/{{.noteId}}/latest.json",
+      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-author/{{.authorName}}/{{.noteId}}/latest.json",
       "type": "pointer",
       "strategy": "write"
     }

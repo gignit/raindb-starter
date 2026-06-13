@@ -78,6 +78,26 @@ message) -- curl the failing endpoint and read it. `ctx.log.*` lines go
 to the platform's log stream; there is no CLI log-tail verb today, so
 make your error responses informative.
 
+## Read the patterns guide before designing formations
+
+The marketplace ships the definitive formation-design document. Install
+it once and read it -- it covers the dual-UUID write contract, index
+types (pointer / full / compound / descIndex feeds), the four access
+tiers and when to use each, listKeys Relay cursors, listSince tailing,
+SQL dedup + freshness bookmarks, floats, denormalization, and the
+canonical pair pattern:
+
+```bash
+raindb-cli --profile <p> pack install raindb/guide-patterns
+# -> installs to ~/.local/share/raindb/packs/raindb/guide-patterns/<version>/README.md
+# read that file IN FULL before designing anything non-trivial
+```
+
+The example packs (`raindb-cli pack list`) ship working formation
+configs you can copy: `raindb/social` (chat/feeds), `raindb/user-auth-email`
+(login), `raindb/media-photos` (binary floats), `raindb/finance-transactions`
+(three-tier SQL), `raindb/real-estate-listings`.
+
 ## Phase 1: make it YOUR app
 
 The example domain is notes. Replacing it is mechanical:
@@ -202,6 +222,16 @@ IAM section of the @raindb/bolt-sdk README
    decision).
 9. The first `npm install` builds the SDKs from source (they install
    from GitHub; postinstall compiles them). ~30s one-time cost.
+10. Do NOT name a payload field `author` if you index on it. Index
+    path templates render payload fields by name, but the platform
+    injects its own template variables too, and `{{.author}}` is the
+    WRITE AUTHOR (the writing principal -- inside a bolt that renders
+    as `bolt:<boltId>`, not your payload value). Your per-author
+    index will silently bucket everything under the bolt's identity.
+    Use `authorName`, `ownerId`, etc. Treat platform-injected names
+    (`author`, `tenantId`, `dropletId`, `yyyy`/`mm`/`dd`) as reserved.
+    Debugging signature: `raindb-cli droplet keys "indexes/<formation>/<index>/"`
+    shows `bolt:...` where your field value should be.
 
 ## Conventions for agents working in this repo
 

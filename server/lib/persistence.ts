@@ -6,7 +6,8 @@
 // Capabilities are declared in config/capabilities.json and enforced by the
 // runtime; touching an undeclared formation throws CapabilityDenied.
 //
-// Three primitives cover almost everything:
+// Three primitives cover almost everything (the full decision tree is in
+// the patterns guide: `raindb-cli pack install raindb/guide-patterns`):
 //
 //   db.readLatest({ formationId, indexId, scopeValue })
 //       O(1): one pointer GET + one entity GET. "Give me the current
@@ -19,12 +20,20 @@
 //
 //   db.listKeys({ formationId, indexId, opts: { prefix, first, after } })
 //       O(pageSize) listing over an index. The key PATH carries the ids --
-//       parse them out of the path segments (see listNotesByAuthor).
+//       parse them out of the path segments (see listNoteIdsByAuthor).
+//
+// NAMING GOTCHA (cost us a debugging session): index path templates render
+// payload fields by name, but the platform ALSO injects template variables
+// of its own -- and `{{.author}}` is the WRITE AUTHOR (the writing
+// principal, e.g. "bolt:<boltId>"), which shadows any payload field named
+// `author`. That is why the payload field here is `authorName`. Treat
+// platform-reserved names (author, tenantId, dropletId, yyyy/mm/dd) as
+// off-limits for payload fields you want to index on.
 //
 // When you outgrow these (analytics, aggregations, full scans), the same
 // formation is queryable with SQL via Periscope -- no schema work, it is
 // already configured in formations/starter-notes-config.json. Try it:
-//   raindb-cli sql -c 'SELECT author, COUNT(*) FROM entity."starter-notes" GROUP BY author'
+//   raindb-cli sql -c 'SELECT authorName, COUNT(*) FROM entity."starter-notes" GROUP BY authorName'
 
 import { db, ids } from "@raindb/bolt-sdk";
 
@@ -32,7 +41,7 @@ export const FORMATION_NOTES = "starter-notes";
 
 export interface Note {
   noteId: string;
-  author: string;
+  authorName: string;
   title: string;
   body: string;
   tags?: string[];
@@ -55,14 +64,14 @@ export async function readNote(noteId: string): Promise<Note | null> {
  * order -- no created_at sorting needed). Returns the full note.
  */
 export async function createNote(fields: {
-  author: string;
+  authorName: string;
   title: string;
   body: string;
   tags?: string[];
 }): Promise<Note> {
   const note: Note = {
     noteId: ids.uuidv7(),
-    author: fields.author,
+    authorName: fields.authorName,
     title: fields.title,
     body: fields.body,
     tags: fields.tags ?? [],
@@ -77,10 +86,12 @@ export async function createNote(fields: {
 }
 
 /**
- * Update a note: read latest, merge, write a NEW droplet. There is no
- * in-place update in RainDB -- every revision is preserved, and the
- * by-id-latest pointer moves to the newest one. This is your undo log,
- * audit trail, and version history for free.
+ * Update a note: read latest, SPREAD THE FULL PRIOR PAYLOAD, apply
+ * changes, write a NEW droplet. There is no in-place (or partial)
+ * update in RainDB -- if you spread only your changes, every field you
+ * didn't mention is silently dropped from the current view. Every
+ * revision is preserved; the by-id-latest pointer moves to the newest.
+ * This is your undo log, audit trail, and version history for free.
  */
 export async function updateNote(
   noteId: string,
@@ -105,12 +116,12 @@ export async function updateNote(
  * List a single author's noteIds by walking the by-author index.
  *
  * Index templates put the ids IN THE KEY PATH:
- *   .../indexes/starter-notes/by-author/{author}/{noteId}/latest.json
- * so a prefix walk on "{author}/" returns one key per note, and the
+ *   .../indexes/starter-notes/by-author/{authorName}/{noteId}/latest.json
+ * so a prefix walk on "{authorName}/" returns one key per note, and the
  * noteId is the second-to-last path segment. O(pageSize) regardless of
  * how many notes exist in the tenant.
  */
-export async function listNoteIdsByAuthor(author: string): Promise<string[]> {
+export async function listNoteIdsByAuthor(authorName: string): Promise<string[]> {
   const found: string[] = [];
   let cursor: string | undefined;
   for (;;) {
@@ -119,7 +130,7 @@ export async function listNoteIdsByAuthor(author: string): Promise<string[]> {
       indexId: "by-author",
       opts: {
         first: 200,
-        prefix: author + "/",
+        prefix: authorName + "/",
         ...(cursor ? { after: cursor } : {}),
       },
     });

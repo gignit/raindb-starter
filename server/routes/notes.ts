@@ -19,8 +19,8 @@ import {
 /** GET /api/notes[?author=x] -- list notes (newest first; UUIDv7 sorts). */
 export async function handleListNotes(req: BoltRequest): Promise<BoltResponse> {
   const raw = req.query?.["author"];
-  const author = Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? "");
-  const idsAsc = author ? await listNoteIdsByAuthor(author) : await listAllNoteIds();
+  const authorName = Array.isArray(raw) ? (raw[0] ?? "") : (raw ?? "");
+  const idsAsc = authorName ? await listNoteIdsByAuthor(authorName) : await listAllNoteIds();
   const notes = await readNotes(idsAsc.sort().reverse());
   return ok({ notes });
 }
@@ -29,12 +29,12 @@ export async function handleListNotes(req: BoltRequest): Promise<BoltResponse> {
 export async function handleCreateNote(req: BoltRequest): Promise<BoltResponse> {
   const body = readJsonBody(req);
   if (!body) return bad("invalid JSON body");
-  const author = typeof body.author === "string" ? body.author.trim() : "";
+  const authorName = typeof body.author === "string" ? body.author.trim() : "";
   const title = typeof body.title === "string" ? body.title.trim() : "";
   const text = typeof body.body === "string" ? body.body : "";
-  if (!author || !title) return bad("author and title are required");
+  if (!authorName || !title) return bad("author and title are required");
   const tags = Array.isArray(body.tags) ? body.tags.filter((t): t is string => typeof t === "string") : [];
-  const note = await createNote({ author, title, body: text, tags });
+  const note = await createNote({ authorName, title, body: text, tags });
   return ok({ note });
 }
 

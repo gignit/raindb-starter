@@ -84,7 +84,7 @@ function NotesPanel() {
           <li key={n.noteId} className="note">
             <div className="note-head">
               <strong>{n.title}</strong>
-              <span className="meta">{n.author}</span>
+              <span className="meta">{n.authorName}</span>
             </div>
             {n.body && <p>{n.body}</p>}
             <span className="meta">{new Date(n.createdAt).toLocaleString()}</span>
