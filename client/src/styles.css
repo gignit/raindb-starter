@@ -111,3 +111,35 @@ button:disabled { opacity: 0.5; cursor: default; }
 .pod-cert-grid .d.ok { background: #2ea043; }
 .pod-cert-grid .d.bad { background: #f85149; }
 .pod-cert-grid .d.unknown { background: #d29922; }
+
+/* ---- Collapsible agent "thinking" trace ---- */
+.chat-line .thinking {
+  margin: 0 0 8px;
+  border: 1px solid #2a2f3a;
+  border-radius: 6px;
+  background: #11151c;
+  font-size: 12px;
+}
+.chat-line .thinking > summary {
+  cursor: pointer;
+  padding: 5px 10px;
+  color: #8b98a5;
+  list-style: none;
+  user-select: none;
+}
+.chat-line .thinking > summary::-webkit-details-marker { display: none; }
+.chat-line .thinking > summary::before {
+  content: "\25B6";
+  display: inline-block;
+  margin-right: 7px;
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+.chat-line .thinking[open] > summary::before { transform: rotate(90deg); }
+.chat-line .thinking[open] > summary { color: #adbac7; border-bottom: 1px solid #2a2f3a; }
+.thinking-steps {
+  margin: 0;
+  padding: 6px 10px 8px 26px;
+  color: #8b98a5;
+}
+.thinking-steps li { margin: 2px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }

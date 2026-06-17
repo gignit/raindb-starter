@@ -164,8 +164,11 @@ function NotesPanel() {
 // ---- Chat --------------------------------------------------------------
 
 interface ChatLine {
-  kind: "user" | "assistant" | "activity" | "error";
+  kind: "user" | "assistant" | "error";
   text: string;
+  /** For assistant turns: the agent's activity trace (thinking + tool calls),
+   *  shown in a collapsible section above the answer. */
+  trace?: string[];
 }
 
 function ChatPanel() {
@@ -185,20 +188,41 @@ function ChatPanel() {
     if (!message || busy) return;
     setInput("");
     setBusy(true);
-    setLines((ls) => [...ls, { kind: "user", text: message }]);
+    // The live activity trace for THIS turn (thinking + tool calls), shown in
+    // a collapsible section and preserved on the finished assistant message.
+    const trace: string[] = [];
+    setLines((ls) => [
+      ...ls,
+      { kind: "user", text: message },
+      { kind: "assistant", text: "", trace }, // placeholder, fills as events stream
+    ]);
+
+    // Update the in-flight assistant line (always the last line) in place.
+    const patchLast = (patch: Partial<ChatLine>) =>
+      setLines((ls) => {
+        const next = ls.slice();
+        const last = next[next.length - 1];
+        if (last && last.kind === "assistant") next[next.length - 1] = { ...last, ...patch };
+        return next;
+      });
 
     const onEvent = (ev: ChatEvent) => {
       if (ev.type === "thinking") {
-        setLines((ls) => [...ls, { kind: "activity", text: "thinking..." }]);
+        trace.push(`thinking (step ${String(ev.iteration ?? "")})`.trim());
+        patchLast({ trace: [...trace] });
       } else if (ev.type === "tool-call") {
-        setLines((ls) => [...ls, { kind: "activity", text: `tool: ${String(ev.toolName)}` }]);
+        trace.push(`tool call: ${String(ev.toolName)}`);
+        patchLast({ trace: [...trace] });
+      } else if (ev.type === "tool-result") {
+        trace.push(`tool result: ${String(ev.toolName ?? "")}`.trim());
+        patchLast({ trace: [...trace] });
       } else if (ev.type === "final") {
         const content = String(ev.content ?? "");
-        setLines((ls) => [...ls.filter((l) => l.kind !== "activity"), { kind: "assistant", text: content }]);
+        patchLast({ text: content, trace: [...trace] });
         historyRef.current.push({ role: "user", content: message });
         historyRef.current.push({ role: "assistant", content });
       } else if (ev.type === "error") {
-        setLines((ls) => [...ls, { kind: "error", text: String(ev.error ?? "unknown error") }]);
+        patchLast({ kind: "error", text: String(ev.error ?? "unknown error") } as Partial<ChatLine>);
       }
     };
 
@@ -223,7 +247,31 @@ function ChatPanel() {
         )}
         {lines.map((l, i) => (
           <div key={i} className={`chat-line ${l.kind}${l.kind === "assistant" ? " markdown-body" : ""}`}>
-            {l.kind === "assistant" ? <Md>{l.text}</Md> : l.text}
+            {l.kind === "assistant" ? (
+              <>
+                {l.trace && l.trace.length > 0 && (
+                  <details className="thinking" open={l.text === ""}>
+                    <summary>
+                      {l.text === ""
+                        ? `thinking${".".repeat((l.trace.length % 3) + 1)}`
+                        : `thought process (${l.trace.length} step${l.trace.length === 1 ? "" : "s"})`}
+                    </summary>
+                    <ul className="thinking-steps">
+                      {l.trace.map((t, j) => (
+                        <li key={j}>{t}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+                {l.text === "" && (!l.trace || l.trace.length === 0) ? (
+                  <span className="meta">thinking...</span>
+                ) : (
+                  <Md>{l.text}</Md>
+                )}
+              </>
+            ) : (
+              l.text
+            )}
           </div>
         ))}
       </div>

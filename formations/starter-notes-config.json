@@ -18,6 +18,12 @@
       "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-author/{{.authorName}}/{{.noteId}}/latest.json",
       "type": "pointer",
       "strategy": "write"
+    },
+    {
+      "name": "by-update",
+      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-update/{{.dropletId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
     }
   ],
   "actions": [

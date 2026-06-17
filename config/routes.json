@@ -15,7 +15,10 @@
 
     { "method": "GET",  "path": "/api/prisma/notes",   "handler": "onHttpRequest" },
     { "method": "POST", "path": "/api/prisma/notes",   "handler": "onHttpRequest" },
-    { "method": "GET",  "path": "/api/prisma/notes/*", "handler": "onHttpRequest" }
+    { "method": "GET",  "path": "/api/prisma/notes/*", "handler": "onHttpRequest" },
+
+    { "method": "GET",  "path": "/api/*", "handler": "onHttpRequest" },
+    { "method": "POST", "path": "/api/*", "handler": "onHttpRequest" }
   ],
   "static": [
     { "path": "/assets/*", "publicAsset": "assets/" },
