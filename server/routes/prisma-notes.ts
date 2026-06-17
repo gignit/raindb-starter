@@ -66,14 +66,16 @@ export async function handlePrismaListNotes(
   const where = authorName ? { authorName } : undefined;
 
   const prisma = await getPrisma(ctx);
-  const [notes, total] = await Promise.all([
-    prisma.note.findMany({
-      ...(where ? { where } : {}),
-      orderBy: { noteId: "desc" },
-      take: 50,
-    }),
-    prisma.note.count(where ? { where } : undefined),
-  ]);
+  // Run SEQUENTIALLY, not in parallel: RainDB enforces a per-tenant
+  // concurrent-query (CCU) limit on the Periscope SQL plane. Firing findMany
+  // and count together can trip CONCURRENCY_LIMIT on small plans. Sequential
+  // is the safe default for a starter; raise CCU if you need parallelism.
+  const notes = await prisma.note.findMany({
+    ...(where ? { where } : {}),
+    orderBy: { noteId: "desc" },
+    take: 50,
+  });
+  const total = await prisma.note.count(where ? { where } : undefined);
   return ok({
     notes,
     total,
