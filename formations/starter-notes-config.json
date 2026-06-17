@@ -23,7 +23,13 @@
       "name": "by-update",
       "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-update/{{.dropletId}}/latest.json",
       "type": "pointer",
-      "strategy": "write"
+      "strategy": "write",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "tenants/{{.tenantId}}/indexes/starter-notes/by-update.desc/{{.dropletId}}/meta.json",
+        "latestPointerTemplate": "tenants/{{.tenantId}}/indexes/starter-notes/by-update.desc/latest.json",
+        "setsTemplate": "tenants/{{.tenantId}}/indexes/starter-notes/by-update.sets/{{.setId}}/meta.json"
+      }
     }
   ],
   "actions": [
@@ -34,7 +40,7 @@
     "tiers": {
       "stream": {
         "enabled": true,
-        "source": { "type": "droplets", "index": "by-id-latest" },
+        "source": { "type": "droplets", "index": "by-update" },
         "trigger": { "operator": "OR", "next": "*/5 * * * *", "tz": "UTC" },
         "path": "tenants/{{.tenantId}}/periscope/{{.formationId}}/stream/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.poolId}}.parquet",
         "retainInputs": true,
