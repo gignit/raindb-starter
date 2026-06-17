@@ -1,5 +1,7 @@
 node_modules/
 dist/
+samples/
+.runner/
 client/dist/
 client/node_modules/
 .bolt-url
