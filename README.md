@@ -15,18 +15,25 @@ to a deployed app, and the patterns to follow when you build on top.
    Browser (Vite + React, hot-reload locally)
         |  /api/*
         v
-   Lightning Bolt    <-- the app server. TypeScript on @raindb/bolt-sdk,
-   (server/)             bundled with esbuild, run by the RainDB runtime.
-        |
-        |  db.*  (capability-gated, typed)      runAgent (@raindb/agent)
-        v                                              |
-   RainDB substrate:                                   v
+   Lightning Bolt    <-- the app server. TypeScript bundled with esbuild,
+   (server/)             run on the RainDB Lightning POD runtime (real
+        |                Node.js 20 + native WASM).
+        |  db.* (@raindb/bolt-sdk)   runAgent (@raindb/agent)   PrismaClient (@raindb/prisma-adapter)
+        v          |                        |                        |
+   RainDB substrate:                        v                        v
      - Formations  = your data model (declarative config + schema)
      - Droplets    = immutable writes (UUIDv7 = chronology)
      - Indexes     = the joins (O(pageSize) reads at any scale)
      - Periscope   = SQL over the same data (DuckDB + Parquet)
      - /v1/*       = an OpenAI-compatible model surface (the AI's brain)
 ```
+
+This starter ships and exercises **all three RainDB SDKs** on the pod
+runtime: `@raindb/bolt-sdk` (the typed `db.*` bindings), `@raindb/agent`
+(the AI agent loop), and `@raindb/prisma-adapter` (standard Prisma over
+RainDB -- which is why it runs on the **pod** engine: Prisma 7's WASM query
+compiler needs real Node + WebAssembly, which the legacy `goja` engine
+cannot provide).
 
 ## Why build on this
 
@@ -45,8 +52,17 @@ to a deployed app, and the patterns to follow when you build on top.
 
 ## Quick start
 
-**Prerequisites:** `raindb-cli` on your PATH ([get it at
-raindb.io](https://raindb.io)), Node >= 20.
+**Prerequisites:**
+- `raindb-cli` on your PATH ([get it at raindb.io](https://raindb.io)), Node >= 20.
+- **A RainDB environment whose Lightning hosts have the `nodejs-20` pod engine
+  enabled** (rtest today; other environments once their hosts are
+  pod-provisioned). The pod engine registry is platform/admin-managed
+  (Private-tier `capabilities.pod.engines`) -- a tenant does **not** self-enable
+  it. As a tenant you simply set `engine: nodejs-20` in `config/deployment.json`
+  and deploy; it works if your host has the engine. (To enable pod on an
+  environment that lacks it, a platform admin registers `nodejs-20` on that
+  env's Lightning hosts.) The 3rd SDK (Prisma) requires the pod runtime; the
+  notes + AI features alone also run on the legacy `goja` engine.
 
 ```bash
 # 1. Get the template
@@ -88,13 +104,18 @@ client/                 Vite + React + TS UI (notes board + AI chat)
 server/
   index.ts              onHttpRequest -- the dispatcher (the backend's only door)
   lib/persistence.ts    ALL RainDB IO, via typed db.* bindings -- READ THIS FIRST
+  lib/prisma.ts         the @raindb/prisma-adapter surface (SDK #3): PrismaClient on RainDB
   lib/http.ts           request/response helpers
-  routes/notes.ts       the example CRUD surface (replace with your domain)
+  routes/notes.ts       the example CRUD surface via db.* (replace with your domain)
+  routes/prisma-notes.ts  the SAME notes via Prisma (create/findUnique/findMany)
+  routes/pod-info.ts    GET /api/pod-info -- runtime + 3-SDK certification probe
   ai/chat.ts            the AI assistant: agent loop + custom tool + SSE streaming
+prisma/
+  schema.prisma         one Note model mapped onto the starter-notes formation
 config/
-  capabilities.json     what the bolt may touch (formations, secrets, network)
+  capabilities.json     what the bolt may touch (formations, secrets, network, limits)
   routes.json           how requests reach the handler (SSE routes flagged streaming)
-  deployment.json       engine (goja) + entrypoint + healthcheck
+  deployment.json       engine (nodejs-20 pod) + entrypoint (dist/main.cjs) + healthcheck
 formations/             the data model: starter-notes (config + schema pair)
 scripts/
   setup.sh              one-command setup (comments = documentation)
@@ -104,18 +125,39 @@ AGENTS.md               the AI-agent operating manual -- patterns + recipes
 
 ## What the example app does
 
-A notes board with an AI assistant:
+A notes board with an AI assistant, exercising all three SDKs over **one
+data model with two surfaces**:
 
-- **Notes** are droplets in the `starter-notes` formation. Create and
-  edit produce NEW immutable revisions; the `by-id-latest` pointer
-  index always resolves the current one. Version history is free.
+- **Notes via `db.*`** (`@raindb/bolt-sdk`) are droplets in the
+  `starter-notes` formation. Create and edit produce NEW immutable
+  revisions; the `by-id-latest` pointer index always resolves the current
+  one. Version history is free. (`server/lib/persistence.ts`,
+  `server/routes/notes.ts`.)
+- **The same notes via Prisma** (`@raindb/prisma-adapter`):
+  `POST/GET /api/prisma/notes` run standard `prisma.note.create` /
+  `findUnique` / `findMany` against the **same** formation -- a note written
+  with Prisma is readable via `db.*` and vice versa. This is the headline
+  "bring your ORM, keep RainDB" demo, and it's why the app runs on the pod
+  (Prisma's WASM compiler). (`server/lib/prisma.ts`, `prisma/schema.prisma`.)
 - **The assistant** (`POST /api/chat`) is `@raindb/agent`'s `runAgent`
   loop with one custom tool (`list_notes`) that reads the formation.
   Progress streams to the browser as SSE frames -- thinking, tool
-  calls, final answer, live.
+  calls, final answer, live. The UI keeps each turn's thinking trace in a
+  collapsible section.
+- **`GET /api/pod-info`** is a one-call certification probe: Node version,
+  WebAssembly, which SDKs loaded, and a live Prisma round-trip.
 - **SQL for free**: the formation has a Periscope tier configured, so
-  once data flows you can `raindb-cli sql -c 'SELECT author, COUNT(*)
-  FROM entity."starter-notes" GROUP BY author'`.
+  once data flows you can `raindb-cli sql -c 'SELECT authorName, COUNT(*)
+  FROM entity."starter-notes" GROUP BY authorName'`.
+
+**Consistency note (important for Prisma):** `findUnique`/`findFirst` by id
+read the **resolution plane** -- immediate and authoritative. `findMany` /
+`count` / aggregates read the **Periscope columnar plane**, which is
+**eventually consistent** (the stream tier pools on a schedule, default ~5
+min). So a just-written row appears instantly via `findUnique` but may lag in
+`findMany` until the pool materializes it. This is by design today (the
+host's instant-merge overlay is a future feature); for read-your-writes on a
+single record, read it by id.
 
 Replace `starter-notes` with your domain entity and you have your app.
 
@@ -137,6 +179,9 @@ Replace `starter-notes` with your domain entity and you have your app.
   install any of them with `raindb-cli pack install <name>` and copy
   their working formation configs.
 - **The SDK guides**: [@raindb/bolt-sdk](https://github.com/gignit/raindb-bolt-sdk-ts)
-  (every binding: db, secrets, jwt, crypto, IAM, SSE) and
+  (every binding: db, secrets, jwt, crypto, IAM, SSE),
   [@raindb/agent](https://github.com/gignit/raindb-agent-ts) (the
-  agent loop + tool catalog).
+  agent loop + tool catalog), and
+  [@raindb/prisma-adapter](https://github.com/gignit/raindb-prisma)
+  (standard Prisma over RainDB -- reads route to the resolution plane or
+  Periscope SQL; writes become immutable droplets).
