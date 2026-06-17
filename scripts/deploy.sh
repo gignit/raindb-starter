@@ -202,8 +202,8 @@ elif [ ! -d "$REPO_DIR/client/dist" ]; then
       "Fix the client build error above, or build it manually: cd client && npm install && npm run build."
 fi
 
-[ -f "$REPO_DIR/dist/main.js" ] || fail \
-  "dist/main.js does not exist after the build." \
+[ -f "$REPO_DIR/dist/main.cjs" ] || fail \
+  "dist/main.cjs does not exist after the build." \
   "The esbuild step did not emit the bundle. Run: npm run build and read its output." \
   "Check esbuild.config.mjs entryPoints still points at server/index.ts."
 
@@ -220,7 +220,7 @@ DEPLOY_OUT="$(cd "$REPO_DIR" && raindb-cli --profile "$PROFILE" --timeout 180 li
   --routes "$REPO_DIR/config/routes.json" \
   --deployment "$REPO_DIR/config/deployment.json" \
   --client-dist "client/dist" \
-  --entry "dist/main.js" 2>&1)" || {
+  --entry "dist/main.cjs" 2>&1)" || {
   echo "$DEPLOY_OUT" >&2
   case "$DEPLOY_OUT" in
     *401*|*unauthorized*|*Unauthorized*)

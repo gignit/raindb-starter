@@ -1,6 +1,7 @@
 {
-  "engine": "goja",
-  "entrypoint": "dist/main.js",
+  "engine": "nodejs-20",
+  "runtimeLanguage": "javascript",
+  "entrypoint": "dist/main.cjs",
   "mount": "/",
   "healthcheck": "/api/health",
   "stripPrefix": false,

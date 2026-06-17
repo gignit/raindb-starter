@@ -1,0 +1,56 @@
+// prisma/schema.prisma -- the THIRD SDK surface.
+//
+// THE POINT OF THIS FILE: prove that standard, unmodified Prisma runs on
+// RainDB -- the SAME `starter-notes` data you write with the raw db.*
+// bindings (server/lib/persistence.ts) is ALSO queryable through a normal
+// PrismaClient. One data model, two surfaces:
+//
+//   db.* (bolt-sdk)   -> the low-level primitive: pointer reads, droplet
+//                        writes, index walks. ~150 lines, read it in 5 min.
+//   Prisma (adapter)  -> the familiar ORM: prisma.note.create / findUnique /
+//                        findMany / count, translated to RainDB ops by
+//                        @raindb/prisma-adapter (reads route to the
+//                        resolution plane or Periscope SQL; writes become
+//                        immutable droplets).
+//
+// WHY THIS NEEDS THE POD (not goja): Prisma 7 compiles queries with a WASM
+// query compiler. goja (the constrained fast-path engine) has no
+// WebAssembly. The Lightning POD runtime is full Node.js with native WASM,
+// so the generated client's base64-inlined query compiler instantiates and
+// runs. This schema + the routes in server/routes/prisma-notes.ts are the
+// certification that the pod runs real Prisma.
+//
+// Generate the client (the build does this): `npx prisma generate`.
+// The client lands in prisma/generated/ and esbuild inlines it (WASM and
+// all) into dist/main.js with --platform=node.
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+  output          = "./generated"
+}
+
+datasource db {
+  // RainDB's Periscope SQL plane speaks PostgreSQL dialect; the adapter
+  // maps Prisma's compiled SQL onto it. No real Postgres exists -- the
+  // adapter is the driver.
+  provider = "postgresql"
+}
+
+// One model, mapped onto the SAME `starter-notes` formation the raw db.*
+// layer writes. @@map applies the Periscope table-name rule
+// (hyphen -> double underscore): starter-notes -> "starter__notes".
+//
+// The @id is `noteId` (the formation's scopeKey). @default(uuid(7)) makes
+// Prisma mint a UUIDv7 when the caller omits it -- matching ids.uuidv7() in
+// the raw layer, so both surfaces produce chronologically-ordered ids.
+model Note {
+  noteId     String   @id @default(uuid(7)) @map("noteId")
+  authorName String?  @map("authorName")
+  title      String?  @map("title")
+  body       String?  @map("body")
+  createdAt  String?  @map("createdAt")
+  updatedAt  String?  @map("updatedAt")
+
+  @@map("starter__notes")
+}

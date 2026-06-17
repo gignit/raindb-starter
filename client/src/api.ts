@@ -45,6 +45,64 @@ export async function createNote(fields: {
   return data.note;
 }
 
+// ---- Prisma surface (SDK #3) -------------------------------------------
+//
+// The SAME notes, read/written through a standard PrismaClient on RainDB.
+// These hit /api/prisma/* (which only run on the Node pod, where Prisma's
+// WASM query compiler can execute). Proof that an unmodified ORM works.
+
+export interface PrismaNote {
+  noteId: string;
+  authorName: string | null;
+  title: string | null;
+  body: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+}
+
+export async function prismaListNotes(
+  author?: string,
+): Promise<{ notes: PrismaNote[]; total: number; via: string }> {
+  const qs = author ? `?author=${encodeURIComponent(author)}` : "";
+  return json(await fetch(`/api/prisma/notes${qs}`));
+}
+
+export async function prismaCreateNote(fields: {
+  author: string;
+  title: string;
+  body: string;
+}): Promise<{ note: PrismaNote; via: string }> {
+  return json(
+    await fetch("/api/prisma/notes", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(fields),
+    }),
+  );
+}
+
+// ---- Pod certification probe -------------------------------------------
+
+export interface PodInfo {
+  service: string;
+  certified: boolean;
+  summary: string;
+  runtime: {
+    nodeVersion: string;
+    v8: string | null;
+    webAssembly: string;
+    fetch: string;
+    isPodLikely: boolean;
+  };
+  sdks: Record<string, boolean>;
+  prisma: { ok: boolean; detail: string; count?: number; sampleNoteId?: string | null };
+  ts: string;
+}
+
+export async function getPodInfo(): Promise<PodInfo> {
+  return json(await fetch("/api/pod-info"));
+}
+
 // ---- SSE chat ----------------------------------------------------------
 //
 // POST /api/chat streams the agent loop's progress as SSE frames. We use

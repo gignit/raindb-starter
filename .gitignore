@@ -2,6 +2,7 @@ node_modules/
 dist/
 samples/
 .runner/
+prisma/generated/
 client/dist/
 client/node_modules/
 .bolt-url

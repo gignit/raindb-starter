@@ -3,21 +3,26 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "The RainDB starter template. A complete, deployable full-stack app: TypeScript Lightning bolt server (@raindb/bolt-sdk + @raindb/agent) + Vite/React client. Clone it, run scripts/setup.sh, and you have a live app on RainDB.",
+  "description": "The RainDB starter template. A complete, deployable full-stack app: TypeScript Lightning bolt server (@raindb/bolt-sdk + @raindb/agent + @raindb/prisma-adapter) + Vite/React client. Clone it, run scripts/setup.sh, and you have a live app on RainDB.",
   "dependencies": {
     "@raindb/bolt-sdk": "github:gignit/raindb-bolt-sdk-ts",
-    "@raindb/agent": "github:gignit/raindb-agent-ts"
+    "@raindb/agent": "github:gignit/raindb-agent-ts",
+    "@raindb/prisma-adapter": "file:../raindb-prisma",
+    "@prisma/client": "^7.0.0"
   },
 
   "devDependencies": {
     "@types/node": "^20.17.0",
     "esbuild": "^0.24.0",
+    "prisma": "^7.0.0",
+    "tsup": "^8.0.0",
     "typescript": "^5.7.2"
   },
   "scripts": {
     "postinstall": "node scripts/ensure-sdk-built.mjs",
+    "prisma:generate": "prisma generate --schema prisma/schema.prisma",
     "typecheck": "tsc --noEmit",
-    "build": "npm run typecheck && node esbuild.config.mjs",
+    "build": "npm run prisma:generate && npm run typecheck && node esbuild.config.mjs",
     "deploy": "bash scripts/deploy.sh",
     "deploy:client": "bash scripts/deploy.sh --client"
   },

@@ -4,18 +4,23 @@
       { "id": "starter-notes", "ops": ["read", "write", "list"] }
     ],
     "secrets": {
-      "names": ["LLM_API_BASE", "LLM_API_KEY"]
+      "names": [
+        "LLM_API_BASE",
+        "LLM_API_KEY",
+        "RAINDB_GRAPHQL_ENDPOINT",
+        "RAINDB_GRAPHQL_KEY"
+      ]
     }
   },
   "network": {
-    "egress": ["api.raindb.io", "raindb.io", "api.devx.raindb.gignit.com", "raindb.gignit.com"],
+    "egress": ["api.rtest.raindb.io"],
     "fetch": {
-      "allowedHosts": ["api.raindb.io", "raindb.io", "api.devx.raindb.gignit.com", "raindb.gignit.com"]
+      "allowedHosts": ["api.rtest.raindb.io"]
     }
   },
   "limits": {
-    "cpuMs": 10000,
-    "memoryMb": 128,
+    "cpuMs": 30000,
+    "memoryMb": 512,
     "wallMs": 60000
   }
 }

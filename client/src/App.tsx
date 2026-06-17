@@ -19,7 +19,7 @@ import "github-markdown-css/github-markdown-dark.css";
 function Md({ children }: { children: string }) {
   return <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>;
 }
-import { listNotes, createNote, streamChat, type Note, type ChatEvent } from "./api";
+import { listNotes, createNote, streamChat, getPodInfo, type Note, type ChatEvent, type PodInfo } from "./api";
 
 export default function App() {
   return (
@@ -32,11 +32,62 @@ export default function App() {
           no migrations -- the substrate is the backend.
         </p>
       </header>
+      <PodCertification />
       <main className="columns">
         <NotesPanel />
         <ChatPanel />
       </main>
     </div>
+  );
+}
+
+// ---- Pod certification banner ------------------------------------------
+//
+// Calls /api/pod-info and shows whether the runtime is the Node POD with all
+// three SDKs working. On the pod with real creds: green "CERTIFIED". This is
+// the at-a-glance proof the certification target is met.
+
+function PodCertification() {
+  const [info, setInfo] = useState<PodInfo | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const probe = useCallback(async () => {
+    try {
+      setInfo(await getPodInfo());
+      setErr(null);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  useEffect(() => {
+    void probe();
+  }, [probe]);
+
+  const sdk = (name: string) => info?.sdks?.[name];
+  const dot = (ok: boolean | undefined) => (ok ? "ok" : ok === false ? "bad" : "unknown");
+
+  return (
+    <section className={`pod-cert ${info?.certified ? "certified" : "pending"}`}>
+      <div className="pod-cert-head">
+        <strong>Lightning Pod runtime</strong>
+        <span className="pod-cert-badge">
+          {err ? "unreachable" : info ? (info.certified ? "CERTIFIED" : "not certified") : "checking..."}
+        </span>
+        <button className="pod-cert-refresh" onClick={() => void probe()}>refresh</button>
+      </div>
+      {err && <p className="error">pod-info error: {err}</p>}
+      {info && (
+        <ul className="pod-cert-grid">
+          <li><span className={`d ${info.runtime.isPodLikely ? "ok" : "bad"}`} />Node {info.runtime.nodeVersion}</li>
+          <li><span className={`d ${info.runtime.webAssembly === "object" ? "ok" : "bad"}`} />WebAssembly</li>
+          <li><span className={`d ${dot(sdk("@raindb/bolt-sdk"))}`} />bolt-sdk</li>
+          <li><span className={`d ${dot(sdk("@raindb/agent"))}`} />agent</li>
+          <li><span className={`d ${dot(sdk("@raindb/prisma-adapter"))}`} />prisma-adapter</li>
+          <li><span className={`d ${info.prisma.ok ? "ok" : "bad"}`} />Prisma round-trip{typeof info.prisma.count === "number" ? ` (${info.prisma.count} rows)` : ""}</li>
+        </ul>
+      )}
+    </section>
   );
 }
 

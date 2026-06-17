@@ -20,6 +20,12 @@ import {
   handleGetNote,
   handleUpdateNote,
 } from "./routes/notes.js";
+import {
+  handlePrismaCreateNote,
+  handlePrismaGetNote,
+  handlePrismaListNotes,
+} from "./routes/prisma-notes.js";
+import { handlePodInfo } from "./routes/pod-info.js";
 
 export async function onHttpRequest(
   ctx: BoltContext,
@@ -37,12 +43,22 @@ export async function onHttpRequest(
       return ok({ status: "ok", service: "raindb-starter", ts: new Date().toISOString() });
     }
 
-    // Streaming AI route (SSE).
+    // Certification probe: runtime facts + 3-SDK status + live Prisma round-trip.
+    if (method === "GET" && path === "/api/pod-info") return await handlePodInfo(ctx);
+
+    // Streaming AI route (SSE) -- SDK #2 (@raindb/agent).
     if (method === "POST" && path === "/api/chat") {
       return await handleChat(ctx, req);
     }
 
-    // Sync CRUD routes.
+    // Prisma surface -- SDK #3 (@raindb/prisma-adapter), SAME starter-notes data.
+    // (Order matters: the more-specific /api/prisma/* prefix is checked before
+    // the bare /api/notes routes below.)
+    if (method === "POST" && path === "/api/prisma/notes") return await handlePrismaCreateNote(ctx, req);
+    if (method === "GET" && path === "/api/prisma/notes") return await handlePrismaListNotes(ctx, req);
+    if (method === "GET" && path.startsWith("/api/prisma/notes/")) return await handlePrismaGetNote(ctx, req);
+
+    // Sync CRUD routes -- SDK #1 (@raindb/bolt-sdk) raw db.* bindings.
     if (method === "GET" && path === "/api/notes") return await handleListNotes(req);
     if (method === "POST" && path === "/api/notes") return await handleCreateNote(req);
     if (method === "GET" && path.startsWith("/api/notes/")) return await handleGetNote(req);
