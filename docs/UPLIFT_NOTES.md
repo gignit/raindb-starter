@@ -268,3 +268,27 @@ in the SDKs (the exercise's core point). Each is coder-verified absent today:
 RESULT: Ledger ai/chat.ts shrinks ~130 -> ~15 lines (prompt + 3 tools); version
 history = 1 call; feed = sse.send. App code becomes about a LEDGER, not RainDB.
 Build these WITH live/unit tests before the app consumes them; commit+push each.
+
+## SDK GAP #4 (operator-requested): client alerts / unread on new activity
+
+Operator: with SSE there should be an alerts mechanism -- new message -> client
+alert to open the window / an unread-count badge. AGREED + coder-verified real:
+fdn-app proves it (bolt/server/routes/wire-token.ts): every write updates the
+entity chain-head key (indexes/<f>/<index>.desc/<scope>/latest.json); invalidating
+it triggers an SSE WAKEUP to any subscribed browser. mintWireSubscribeToken (graphql,
+coder-verified: input{resources:[String!]!, ttlSec, subjectOverride} -> {token,
+endpoint, keys, expiresInSec}) is the gated mint. But fdn HAND-DERIVES the chain-head
+path (chainHeadKeyFor) and hand-rolls the EventSource -- the ergonomics aren't packaged.
+
+FILL (thin, bounded):
+- bolt-sdk iam.mintActivitySubscription({formationId, indexName, scopeValues, ttlSec})
+  -> derives the .desc/<scope>/latest.json chain-head keys + calls
+  mintWireSubscribeToken. App says "alert me on new activity for these entries"
+  without knowing the key layout (the RainDB construct).
+- client helper subscribeActivity({endpoint, token, keys, onActivity}) -> opens
+  EventSource, fires onActivity(key) per wakeup. Ships as a documented starter
+  client pattern (client isn't in the SDK npm pkg). App decides badge vs popup vs
+  count -- the UI decision stays in the app.
+The wakeup is a SIGNAL ("key X changed"), not a COUNT -- unread count is app state
+the client derives. Ledger feed uses it: new entry -> alert + unread badge when
+the feed isn't focused.
