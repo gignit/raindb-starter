@@ -63,3 +63,50 @@ while making the demo itself a teaching artifact.
 - Repo layout for demo-as-reference + build-real-elsewhere + delete-before-prod.
 - Which engine: default to `goja` (clone-and-run anywhere) and treat pod as
   the advanced/optional path.
+
+## LOCKED PLAN (me + codex + claude consensus, coder-verified)
+
+### Concept: "Ledger" -- a versioned entity workspace with a brain (goja-only)
+One formation, but every screen shows a UNIQUE raindb primitive that a
+Postgres+Prisma+OpenAI stack cannot do:
+- **Create** = immutable droplet. **Edit** = a NEW revision (writeDroplet;
+  by-id newest-wins). A visible **version-history timeline** (readDroplet per
+  revision) with time-travel + one-click **restore** (restore = write the old
+  payload as a new revision). Version history / audit / undo with ZERO schema.
+- **Live activity feed**: by-update + descIndex newest-first page + listSince
+  cursor tail, woken over SSE via mintWireToken. Real-time, no broker.
+- **Ask-your-data AI panel**: runAgent + tools that ARE the persistence
+  functions (list, read, version_history, compare) -> the model answers
+  "what changed and when?" from the revision chain. Per-tenant /v1, no 3rd-party key.
+- **Analytics strip**: periscope SQL over the SAME droplets (count by
+  author/status). OLTP data IS the warehouse, no ETL.
+
+### Prisma: CUT from default. goja-only clone-and-run. Prisma -> optional
+`reference/extensions/prisma-pod/` (own manifest/deploy/README), NOT in root build.
+
+### SDK GAP (coder-verified -- surfaced to operator; ties to raindb-prisma uplift)
+- `@raindb/bolt-sdk` db binding has NO `updateEntity` (only writeDroplet
+  {formationId, payload}). So the canonical UpdateEntity path (what
+  revisions:true needs for regenerateIfChanged) is NOT invokable from a bolt.
+- `reserveUpload`/`reserveDownload` are STUBS (throw BindingNotInstalled).
+- => FLOAT uploads + revisions:true float-versioning are NOT buildable from a
+  bolt today. So the demo's version history comes from the ENTITY DROPLET CHAIN
+  (fully live), NOT floats. Float/CDU + a versioned-file demo is a FOLLOW-UP
+  gated on landing db.updateEntity + the files binding in bolt-sdk (and likely
+  the raindb-prisma uplift touches the same update path).
+
+### Repo layout (mechanically enforced demo-as-reference)
+- `reference/ledger/` -- the complete demo (server+client+formations, `ref-*`
+  formation ids). Read-only by convention. DEPLOYED as its own bolt = a live
+  curl-able oracle.
+- `app/` -- the build target: a minimal green-on-setup skeleton (dispatcher,
+  persistence.ts with one example entity, empty routes). Agent edits ONLY here.
+- `scripts/` -- shared setup/deploy (dir-parameterized) + `remove-reference.sh`
+  (deletes reference/ + its bolt + ref-* formations; fails if root still
+  references them).
+- AGENTS.md -- build in app/, reference/ is the read-only oracle, run
+  remove-reference.sh before prod.
+
+### Unconditional staleness fixes
+by-id (not by-id-latest); tenant-RELATIVE templates; keep gotcha #10
+(reserved template vars: author/dropletId/yyyy...); update all AGENTS recipes.
