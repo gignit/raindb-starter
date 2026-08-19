@@ -244,3 +244,27 @@ the STARTER calls files.reserveUpload instead of a hand-rolled graphql.ts. Versi
 history for the starter uses the LIVE native db.listDroplets (already in the SDK) --
 no app graphql needed there. Net: the app shrinks, the SDK gains the helper every
 bolt author needs. Live-test the augmentation before shipping.
+
+## SDK GAPS TO FILL (so app code = use case, not raindb constructs) -- coder-verified
+
+The remaining tasks each force the app to hand-roll a raindb construct. Fill these
+in the SDKs (the exercise's core point). Each is coder-verified absent today:
+
+1. bolt-sdk db.versionHistory({formationId, scopeValue}) -> Revision[] newest-first.
+   GAP: RainDB's headline (every write = a revision -> free history/audit/undo) has
+   NO helper; every app hand-rolls listDroplets(prefix)+sort (persistence.ts does it
+   twice). Built on the LIVE db.listDroplets. App then just renders a timeline.
+
+2. bolt-sdk SSE helper: startSSE(ctx) -> { send(event,data), close() } owning the
+   streaming-vs-buffered branch + headers + sseFrame. GAP: every streaming bolt
+   hand-copies ~40 lines of identical SSE boilerplate (README + old starter + fdn-app).
+
+3. agent-ts runAgentSSE({ctx:boltCtx, systemPrompt, userPrompt, tools, secrets?})
+   -> resolves creds from the conventional secrets, builds makeBoltNativeHost, wires
+   onEvent straight to the bolt SSE stream, returns AgentResult. GAP: every AI bolt
+   hand-builds the {creds,host,role,userId} block + the onEvent->sseFrame->write
+   bridge (~30 lines, both READMEs show it copy-pasted).
+
+RESULT: Ledger ai/chat.ts shrinks ~130 -> ~15 lines (prompt + 3 tools); version
+history = 1 call; feed = sse.send. App code becomes about a LEDGER, not RainDB.
+Build these WITH live/unit tests before the app consumes them; commit+push each.
