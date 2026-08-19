@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Ledger Entry (v1)",
+  "description": "One immutable REVISION of a ledger entry. The entity is identified by entryId; every write (create or edit) is a new droplet -- the by-id pointer resolves the current revision, and the full droplet chain is the version history / audit trail / undo. No UPDATE, no migrations, no versions table: immutability gives you all three for free.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["entryId", "authorName", "title", "body", "status", "createdAt"],
+  "properties": {
+    "entryId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Stable entity id (UUIDv7, auto-generated). Identifies the entry across every revision."
+    },
+    "authorName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 120,
+      "description": "Display name of who wrote this revision. NOT named 'author' -- {{.author}} is a platform-reserved write-author template var (renders bolt:<boltId>); see AGENTS.md gotcha."
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "body": {
+      "type": "string",
+      "maxLength": 20000
+    },
+    "status": {
+      "type": "string",
+      "enum": ["draft", "active", "archived"],
+      "description": "Lifecycle status. A status change is just a new revision -- the transition is in the history."
+    },
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "maxLength": 40 },
+      "maxItems": 20
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of the FIRST revision. Carried forward unchanged on every edit."
+    },
+    "updatedAt": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp of THIS revision (null on the first)."
+    },
+    "revisionNote": {
+      "type": ["string", "null"],
+      "maxLength": 280,
+      "description": "Optional human note describing what changed in this revision (e.g. 'restored from 3 versions ago')."
+    }
+  }
+}

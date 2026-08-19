@@ -1,0 +1,54 @@
+{
+  "configVersion": 1,
+  "formationId": "ref-entries",
+  "scopeKey": "entryId",
+  "autoGenId": true,
+  "pathTemplate": "entities/ref-entries/{{.entryId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": ["v1"],
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-entries/by-id/{{.entryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-author",
+      "template": "indexes/ref-entries/by-author/{{.authorName}}/{{.entryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-update",
+      "template": "indexes/ref-entries/by-update/{{.entryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "indexes/ref-entries/by-update.desc/{{.dropletId}}/meta.json",
+        "setsTemplate": "indexes/ref-entries/by-update.sets/{{.setId}}/meta.json",
+        "carryFields": ["entryId", "authorName", "title", "status", "updatedAt"]
+      }
+    }
+  ],
+  "queryConfig": { "enabled": true, "flattenDepth": 1, "defaultLimit": 100, "maxLimit": 1000 },
+  "tierPolicy": {
+    "partition": { "strategy": "formation" },
+    "catalog": { "location": "periscope/{{.formationId}}/catalog" },
+    "tiers": {
+      "stream": {
+        "enabled": true,
+        "source": { "type": "droplets", "index": "by-update" },
+        "trigger": { "operator": "OR", "next": "*/5 * * * *", "tz": "UTC" },
+        "retainInputs": true,
+        "retention": { "afterSupersession": "30d" }
+      }
+    }
+  },
+  "views": {
+    "defaultBehavior": { "dedup": true },
+    "queryDefaults": { "autoPool": true, "window": "10s" }
+  }
+}
