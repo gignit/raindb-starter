@@ -184,3 +184,18 @@ degrade the headline to entity-chain-only (A) and keep files as an optional exte
 - capabilities.json network allowlist MUST include the graphql host.
 - /api/health does a REAL reserve round-trip (reserve + abandon) so a broken
   graphql path fails LOUDLY at setup with a named error, never at first upload.
+
+## HARD GATE: PASSED (proven live against vector-sandbox1)
+
+The full versioned-file flow round-trips on the live platform:
+- reserveDirectUpload (graphql) -> presigned S3 url + float path carrying the
+  platform-minted ver/<fileDataVersionId>/ segment (revisions:true working).
+- PUT bytes to the presigned url (x-amz-content-sha256: UNSIGNED-PAYLOAD) -> 200.
+- Completion is IMMEDIATE: readLatest(by-id) resolves the entity on the first
+  poll, fileDataVersionId minted, floatMeta present with the versioned float path.
+Confirmed the graphql contract with coder (reserveDirectUpload input has
+expectedPriorDropletId = the CAS field for versioned updates; readLatest takes
+ReadLatestInput{formationId,indexId,scopeValue}).
+
+The bolt path is: ctx.fetch (LIVE binding, egress-allowlisted) -> POST graphql
+with RAINDB_GRAPHQL_KEY. Standard. => Concept B is GO. Building the app now.
