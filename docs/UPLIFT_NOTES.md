@@ -220,3 +220,27 @@ NOT provided (legitimately hand-rolled):
 
 STARTER LESSON (sharper than the old one): 'AI = makeBoltNativeHost; hot paths =
 native ctx.db.*; the 3 low-frequency ops = graphql over ctx.fetch.'
+
+## FULL SDK UNDERSTANDING (exhaustive README + snapshot read -- corrects earlier)
+
+- bolt-sdk supports BOTH pod + goja (deployment.json engine). goja is default +
+  right for the starter. Same LIVE/STUB tiers across engines.
+- files.* is a DOCUMENTED pending stub (README STUB table, audit O/Gap 10) -- the
+  package model is "wrapper ships, substrate/impl filled in as needed." Filling it
+  is exactly this exercise's point (operator: make it eventually perfect).
+- The graphql-over-fetch pattern ALREADY exists: @raindb/agent src/client/graphql.ts
+  executeGraphQL is the canonical host-routed graphql client, and the agent tool
+  catalog (droplet.ts, entity.ts entity_version_history, droplet_push_public, etc.)
+  implements every non-native op over graphql. My starter graphql.ts DUPLICATES this.
+- AI: use runAgent + makeBoltNativeHost (agent README quick-start). creds =
+  {apiKey, endpoint} from secrets; host = makeBoltNativeHost(ctx); tools = a small
+  custom set. Do NOT hand-roll SSE/model plumbing.
+
+### AUGMENTATION (in-spirit, fills the documented gap):
+Implement bolt-sdk ctx.files.reserveUpload + a versioned download for REAL over
+ctx.fetch->graphql (reserveDirectUpload / readFloat), resolving endpoint+key from
+the bolt's declared secrets (same convention chatCompletionViaCtxFetch uses). Then
+the STARTER calls files.reserveUpload instead of a hand-rolled graphql.ts. Version
+history for the starter uses the LIVE native db.listDroplets (already in the SDK) --
+no app graphql needed there. Net: the app shrinks, the SDK gains the helper every
+bolt author needs. Live-test the augmentation before shipping.
