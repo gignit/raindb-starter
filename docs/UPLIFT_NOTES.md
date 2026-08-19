@@ -157,3 +157,30 @@ pattern -- "high-frequency ops use the native ctx.db bindings; low-frequency ops
 valuable lesson for agents. So the concept is NOT constrained to entity-chain
 history; a versioned-FILE story (claude's "Drops") is on the table again, using
 the intended graphql route. Decide in the concept lock with codex+claude.
+
+## CONCEPT LOCKED: B -- "Ledger" with a versioned-file headline (unanimous me+codex+claude)
+
+Core (always-native, bulletproof): entity version history from the droplet chain
+(writeDroplet revisions + readDroplet time-travel + restore), live activity feed
+(listSince + by-update descIndex + mintWireToken SSE), AI tools over the chain,
+periscope SQL analytics. Every screen = a unique raindb primitive.
+
+Headline (the screenshot no CRUD stack can fake): a versioned FILE attachment via
+revisions:true -- upload over the INTENDED low-frequency route (ctx.fetch ->
+GraphQL reserveDirectUpload), each version's bytes retained at ver/<versionId>/,
+per-version download. Showcases revisions:true (the flagship feature shipped this
+session) AND teaches the native-hot-path vs graphql-low-frequency split.
+
+Prisma: CUT (goja-only). reference/ledger (deployed live oracle) + app/ skeleton +
+remove-reference.sh.
+
+### HARD GATE before building the app around files (codex de-risk):
+Prove the full reserve -> PUT -> completion -> per-revision download flow works on
+a GOJA bolt against vector-sandbox1 FIRST. If it doesn't round-trip cleanly,
+degrade the headline to entity-chain-only (A) and keep files as an optional extension.
+
+### Fresh-clone de-risk (claude):
+- setup.sh stages RAINDB_GRAPHQL_ENDPOINT + RAINDB_GRAPHQL_KEY UNCONDITIONALLY.
+- capabilities.json network allowlist MUST include the graphql host.
+- /api/health does a REAL reserve round-trip (reserve + abandon) so a broken
+  graphql path fails LOUDLY at setup with a named error, never at first upload.
