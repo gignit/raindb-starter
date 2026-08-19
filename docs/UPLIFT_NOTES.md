@@ -140,3 +140,20 @@ broken, don't design around it). Verdict from git history + coder against LIVE c
 **Bottom line: the Ledger starter (version history + feed + AI + SQL) is 100%
 buildable on LIVE bindings today. No SDK parity work required to ship it.** The
 "missing updateEntity" is by design; writeDroplet is correct.
+
+## CORRECTION (operator + code, not the stale audit doc)
+
+files.* (reserveUpload/reserveDownload/pushPublic/readMeta) are INTENTIONALLY
+stubbed as a LOW-FREQUENCY surface (files.ts:1-2,78-89 + operator confirmation),
+deliberately routed over ctx.fetch + GraphQL (reserveDirectUpload / the float
+upload flow), NOT an unfilled oversight. Same intentional pattern as updateEntity:
+low-frequency / infrequent ops accept the graphql-over-ctx.fetch efficiency cost
+rather than a dedicated native fast-path binding.
+
+IMPLICATION: a file-upload + revisions:true versioned-file demo IS buildable now,
+via ctx.fetch -> graphql (reserveDirectUpload + updateEntity). And teaching that
+pattern -- "high-frequency ops use the native ctx.db bindings; low-frequency ops
+(file upload, atomic merge-patch) go over ctx.fetch+graphql" -- is itself a
+valuable lesson for agents. So the concept is NOT constrained to entity-chain
+history; a versioned-FILE story (claude's "Drops") is on the table again, using
+the intended graphql route. Decide in the concept lock with codex+claude.
