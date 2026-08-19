@@ -33,6 +33,19 @@
       }
     }
   ],
+  "floatConfig": {
+    "enabled": true,
+    "fields": [
+      {
+        "sourceField": "attachment",
+        "contentTypeField": "attachmentContentType",
+        "filenameField": "attachmentFilename",
+        "pathTemplate": "floats/ref-entries/{{.entryId}}/{{.attachmentFilename}}",
+        "stripAfterFloat": true,
+        "revisions": true
+      }
+    ]
+  },
   "queryConfig": { "enabled": true, "flattenDepth": 1, "defaultLimit": 100, "maxLimit": 1000 },
   "tierPolicy": {
     "partition": { "strategy": "formation" },

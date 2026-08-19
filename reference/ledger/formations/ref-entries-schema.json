@@ -50,6 +50,19 @@
       "type": ["string", "null"],
       "maxLength": 280,
       "description": "Optional human note describing what changed in this revision (e.g. 'restored from 3 versions ago')."
+    },
+    "attachment": {
+      "type": "string",
+      "contentEncoding": "base64",
+      "description": "Optional file attachment (base64 for inline; large files use reserveDirectUpload). Floated + stripped. revisions:true means EVERY uploaded version is retained + independently downloadable at ver/<attachmentVersionId>/ -- the headline feature. The platform injects attachmentVersionId + the ver/ path segment; you author only revisions:true."
+    },
+    "attachmentContentType": {
+      "type": "string",
+      "description": "MIME type for the floated attachment."
+    },
+    "attachmentFilename": {
+      "type": "string",
+      "description": "Filename for the floated attachment."
     }
   }
 }
