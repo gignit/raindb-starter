@@ -110,3 +110,33 @@ Postgres+Prisma+OpenAI stack cannot do:
 ### Unconditional staleness fixes
 by-id (not by-id-latest); tenant-RELATIVE templates; keep gotcha #10
 (reserved template vars: author/dropletId/yyyy...); update all AGENTS recipes.
+
+## SDK-GAP ADJUDICATION (git intent + coder shape, tests/live discipline)
+
+Investigated the two "gaps" codex flagged, per lead-engineer duty (fix what's
+broken, don't design around it). Verdict from git history + coder against LIVE code:
+
+1. **db.updateEntity binding -- INTENTIONALLY ABSENT, not an oversight.**
+   - coder: host SDKDatabase (pkg/lightning/runtime/engine.go:642) exposes
+     ReadLatest/ReadDroplet/WriteDroplet/ListDroplets/ListKeys/ListSince/Tag/
+     Untag/Expire/WriteBatch/Mutate/MutateAndRead/WriteToken. NO UpdateEntity.
+   - git: the whole surface was built from a gap inventory (each method cites
+     its audit section G/I/L/M...). `updateEntity` is in NONE of it, and appears
+     nowhere in git history. On RainDB, "update" == write a new revision;
+     updateEntity (GraphQL merge-patch) is a client convenience OVER writeDroplet,
+     not a storage op. A bolt does read+merge+write with readLatest+writeDroplet
+     (both LIVE). The rare atomic merge-patch is the acceptable ctx.fetch+graphql
+     edge case. => NO parity work. writeDroplet IS the entity-update primitive.
+
+2. **files.{reserveUpload,reserveDownload,...} -- REAL tracked gap (audit O /
+   Gap 10), stubbed since v0.1.0 (762ae99), never promoted.** BUT: coder shows
+   ctx.objects (SDKObjects, LIVE: Get/Put/Exists/Delete bytes to a declared
+   bucket) covers file bytes from a bolt TODAY. The files binding (presigned
+   direct-to-S3) is a convenience, not a blocker, and filling it is a
+   cross-cutting host feature (new SDKFiles interface + goja binding + pod op +
+   boltDB impl + wrapper) -- OUT OF SCOPE for the starter uplift; tracked as a
+   future gap.
+
+**Bottom line: the Ledger starter (version history + feed + AI + SQL) is 100%
+buildable on LIVE bindings today. No SDK parity work required to ship it.** The
+"missing updateEntity" is by design; writeDroplet is correct.
