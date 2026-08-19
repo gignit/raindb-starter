@@ -37,6 +37,8 @@ export async function gql<T = unknown>(
   variables: Record<string, unknown>,
 ): Promise<T> {
   const { endpoint, key } = await gqlConfig();
+  // ctx.fetch returns a FetchResponse: { status, ok, headers, body } where
+  // `body` is the response text as a STRING (not a .text() method).
   const res = await ctxFetch(endpoint, {
     method: "POST",
     headers: {
@@ -45,12 +47,12 @@ export async function gql<T = unknown>(
     },
     body: JSON.stringify({ query, variables }),
   });
-  const text = await res.text();
+  const text = res.body;
   let parsed: { data?: T; errors?: Array<{ message: string }> };
   try {
     parsed = JSON.parse(text);
   } catch {
-    throw new Error(`GraphQL non-JSON response (status ${res.status}): ${text.slice(0, 300)}`);
+    throw new Error(`GraphQL non-JSON response (status ${res.status}): ${String(text).slice(0, 300)}`);
   }
   if (parsed.errors && parsed.errors.length > 0) {
     throw new Error(`GraphQL error: ${parsed.errors.map((e) => e.message).join("; ")}`);

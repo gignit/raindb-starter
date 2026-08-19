@@ -199,3 +199,24 @@ ReadLatestInput{formationId,indexId,scopeValue}).
 
 The bolt path is: ctx.fetch (LIVE binding, egress-allowlisted) -> POST graphql
 with RAINDB_GRAPHQL_KEY. Standard. => Concept B is GO. Building the app now.
+
+## SDK-PROVIDED vs HAND-ROLLED (operator asked -- coder-verified)
+
+The bolt-sdk handles MORE than the old starter used. Corrected split:
+- AI: use makeBoltNativeHost(ctx) from @raindb/bolt-sdk/agent-bridge -> runAgent
+  ({host, tools, messages}). The host AUTO-routes substrate graphql tool-calls to
+  native bindings + does chatCompletion via ctx.fetch (LLM_API_BASE/LLM_API_KEY
+  secrets). Do NOT hand-roll the LLM POST / model plumbing like the old ai/chat.ts.
+- Hot-path data: native ctx.db.* (persistence.ts). SDK-provided.
+- SSE: ctx.response.{setHeader,beginStream,write}. SDK-provided.
+- SQL: ctx.sql.query (+ freshness helpers isBehind/needsHarvest). SDK-provided.
+- iam.mintWireToken (SSE wakeup): SDK-provided.
+NOT provided (legitimately hand-rolled):
+- HTTP router/dispatch: bolt entry is a single onHttpRequest; write your own path
+  routing (http.ts + index.ts). No app framework in the SDK by design.
+- The 3 low-frequency graphql ops (reserveDirectUpload, readFloat, listDroplets):
+  intentionally non-native -> graphql.ts posts them over ctx.fetch. This is the
+  documented pattern. resp.body is the string body (verified vs host.ts:510).
+
+STARTER LESSON (sharper than the old one): 'AI = makeBoltNativeHost; hot paths =
+native ctx.db.*; the 3 low-frequency ops = graphql over ctx.fetch.'
