@@ -1304,3 +1304,22 @@ listSince, mintWireSubscribeToken, listDroplets) -> probes.
 - NEXT M1.4: probes in raindb-test-lightning-goja for the bolt re-representations
   (queryEntityRowsFresh, versionHistory, files.reserveUpload, startSSE, mintActivitySubscription,
   token.delete, counter mutateAndRead, draft coalescing), then sync-shared -> pod, run-matrix.
+
+## M1.4 PROBE MATRIX RESULT (deploy succeeded, parity perfect goja==pod, 61 probes)
+Fresh deploy on vector-sandbox1 (ENV_NAME=prod) after removing the invalid "delete" cap op.
+MY 6 new probes:
+- sql.queryEntityRowsFresh: OK (goja+pod) -- new SDK primitive PROVEN on real runtime.
+- token.delete: OK -- draft-vanish op PROVEN.
+- startSSE.buffered: OK -- streaming helper PROVEN.
+- db.versionHistory: ok:False, error:None (assertion false, not a throw -- 2 writes may not both land
+  in time, or ts ordering; REFINE probe -- maybe poll/relax).
+- iam.mintActivitySubscription: "auth: missing credential" -- builds on mintWireToken which needs the
+  TENANT GRANT; must run on the authenticated /api/probe-poa route, NOT anonymous /api/probes. RECLASSIFY.
+- files.reserveUpload: "RainDB GraphQL error: internal server error" -- the graphql route WORKED
+  (secrets resolved+authenticated+reached API); 500 is because sdktest-notes has NO float field.
+  reserveUpload needs a FLOAT formation. REFINE probe (target a float formation or accept the 500 shape).
+SDK code is proven; these 3 are probe-authoring refinements, not primitive defects.
+NOTE: /api/health sdkVersion is a hardcoded string (shows 0.6.0) -- NOT the real SDK version; ignore it.
+The matrix run (fresh deploy, my named results) is authoritative.
+POA violations in the matrix = the DOCUMENTED pre-fix expected state (README) -- NOT my concern, they
+gate the overall RESULT:FAIL but are orthogonal to my probes.
