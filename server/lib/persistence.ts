@@ -90,7 +90,7 @@ export async function createNote(fields: {
  * changes, write a NEW droplet. There is no in-place (or partial)
  * update in RainDB -- if you spread only your changes, every field you
  * didn't mention is silently dropped from the current view. Every
- * revision is preserved; the by-id-latest pointer moves to the newest.
+ * revision is preserved; the by-id pointer moves to the newest.
  * This is your undo log, audit trail, and version history for free.
  */
 export async function updateNote(
