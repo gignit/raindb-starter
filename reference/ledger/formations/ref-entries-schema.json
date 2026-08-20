@@ -36,6 +36,10 @@
       "items": { "type": "string", "maxLength": 40 },
       "maxItems": 20
     },
+    "encrypted": {
+      "type": "boolean",
+      "description": "True when body holds CLIENT-SIDE ciphertext (zero-knowledge). The server stores it opaquely and can never read it; the client prompts for the passphrase to decrypt. Tags stay plaintext so the AI can still find the entry."
+    },
     "createdAt": {
       "type": "string",
       "format": "date-time",
