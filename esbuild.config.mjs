@@ -23,7 +23,7 @@
 import { build } from "esbuild";
 
 await build({
-  entryPoints: ["server/index.ts"],
+  entryPoints: ["reference/ledger/server/index.ts"],
   bundle: true,
   // .cjs extension: the starter package.json is `"type":"module"`, so a `.js`
   // file would be loaded as ESM. The pod supervisor does `require(entrypoint)`
@@ -41,4 +41,4 @@ await build({
   logLevel: "info",
 });
 
-console.log("bolt server bundled -> dist/main.cjs (platform=node, Prisma WASM inlined)");
+console.log("bolt server bundled -> dist/main.cjs (goja engine, no ORM -- the substrate is the backend)");

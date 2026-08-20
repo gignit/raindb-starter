@@ -38,6 +38,11 @@ export async function onHttpRequest(ctx: BoltContext, req: BoltRequest): Promise
   ctx.log.info("fitledger.request", { method, path });
 
   try {
+    // ---- health (deployment healthcheck) ----
+    if (path === "/api/health" && method === "GET") {
+      return { status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "ok", app: "fitledger" }) };
+    }
+
     // ---- streaming AI (SSE) first ----
     if (path === "/api/ai/chat" && method === "POST") return await handleChat(ctx, req);
 

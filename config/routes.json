@@ -4,21 +4,13 @@
     { "path": "/.git/*", "status": 404 }
   ],
   "routes": [
-    { "method": "POST", "path": "/api/chat", "handler": "onHttpRequest", "streaming": true },
+    { "method": "POST", "path": "/api/ai/chat", "handler": "onHttpRequest", "streaming": true },
 
-    { "method": "GET",  "path": "/api/health",        "handler": "onHttpRequest" },
-    { "method": "GET",  "path": "/api/pod-info",       "handler": "onHttpRequest" },
-    { "method": "GET",  "path": "/api/notes",          "handler": "onHttpRequest" },
-    { "method": "POST", "path": "/api/notes",          "handler": "onHttpRequest" },
-    { "method": "GET",  "path": "/api/notes/*",        "handler": "onHttpRequest" },
-    { "method": "POST", "path": "/api/notes/*",        "handler": "onHttpRequest" },
-
-    { "method": "GET",  "path": "/api/prisma/notes",   "handler": "onHttpRequest" },
-    { "method": "POST", "path": "/api/prisma/notes",   "handler": "onHttpRequest" },
-    { "method": "GET",  "path": "/api/prisma/notes/*", "handler": "onHttpRequest" },
-
-    { "method": "GET",  "path": "/api/*", "handler": "onHttpRequest" },
-    { "method": "POST", "path": "/api/*", "handler": "onHttpRequest" }
+    { "method": "GET",    "path": "/api/*", "handler": "onHttpRequest" },
+    { "method": "POST",   "path": "/api/*", "handler": "onHttpRequest" },
+    { "method": "PUT",    "path": "/api/*", "handler": "onHttpRequest" },
+    { "method": "PATCH",  "path": "/api/*", "handler": "onHttpRequest" },
+    { "method": "DELETE", "path": "/api/*", "handler": "onHttpRequest" }
   ],
   "static": [
     { "path": "/assets/*", "publicAsset": "assets/" },
