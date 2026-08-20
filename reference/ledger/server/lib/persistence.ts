@@ -180,21 +180,35 @@ export async function restoreRevision(
 
 // ------------------------------------------------------------------ lists
 
-/** Entry ids under one author -- O(pageSize). Ids live in the key PATH. */
+/** Recent entries for one author, newest-first -- O(pageSize).
+ *
+ *  We list the by-update index (its leaf is the entryId, a raw UUID) rather than
+ *  by-author: a by-author prefix would need the author name, and NATURAL-STRING
+ *  path segments are hash-encoded in storage ("Test Athlete" -> a ~b64 segment),
+ *  so a raw-name prefix never matches. Listing by-update (UUID leaf) is prefix-
+ *  safe; we read the payloads and filter by authorName. (A real RainDB lesson:
+ *  prefix-match only on raw/UUID segments, not natural-string ones.)
+ */
 export async function listEntryIdsByAuthor(
   authorName: string,
   limit = 200,
 ): Promise<string[]> {
   const page = await db.listKeys({
     formationId: FORMATION,
-    indexId: IDX_BY_AUTHOR,
-    opts: { first: limit, prefix: `${authorName}/` },
+    indexId: "by-update",
+    opts: { first: limit },
   });
-  // template: indexes/ref-entries/by-author/{authorName}/{entryId}/latest.json
-  // the id is the second-to-last path segment.
-  return page.keys
+  // template: indexes/ref-entries/by-update/{entryId}/latest.json
+  const ids = page.keys
     .map((k) => k.key.split("/").at(-2))
     .filter((v): v is string => typeof v === "string");
+  // Filter to this author (read the current revision of each).
+  const out: string[] = [];
+  for (const id of ids) {
+    const e = await readEntry(id);
+    if (e && e.authorName === authorName) out.push(id);
+  }
+  return out;
 }
 
 /** Read the current revision of many entries (for a list view). */

@@ -157,10 +157,11 @@ done
 # tenant or the bolt's db.* calls will fail at runtime. We check, and
 # publish any missing pair found in formations/ automatically.
 PUBLISHED="$(raindb-cli --profile "$PROFILE" formation list -o json 2>/dev/null || echo '[]')"
-for cfg in "$REPO_DIR"/formations/*-config.json; do
+FORMATIONS_DIR="$REPO_DIR/reference/ledger/formations"
+for cfg in "$FORMATIONS_DIR"/*-config.json; do
   [ -e "$cfg" ] || continue
   fname="$(basename "$cfg" -config.json)"
-  schema="$REPO_DIR/formations/${fname}-schema.json"
+  schema="$FORMATIONS_DIR/${fname}-schema.json"
   [ -e "$schema" ] || continue
   if ! echo "$PUBLISHED" | grep -q "\"$fname\""; then
     log "formation '${fname}' not on tenant -- publishing it now (self-heal)..."
@@ -168,7 +169,7 @@ for cfg in "$REPO_DIR"/formations/*-config.json; do
       --config "$cfg" --schema "$schema" --version 1 >/dev/null 2>&1 \
       || fail "could not publish formation '${fname}'." \
         "Run it by hand for the full error: raindb-cli --profile ${PROFILE} formation publish ${fname} --config ${cfg} --schema ${schema} --version 1" \
-        "If the error is a schema validation problem, fix formations/${fname}-schema.json." \
+        "If the error is a schema validation problem, fix reference/ledger/formations/${fname}-schema.json." \
         "If it is 401, the profile key is stale -- see the profile diagnosis above (re-run tenant create)."
   fi
 done
@@ -205,22 +206,38 @@ fi
 [ -f "$REPO_DIR/dist/main.cjs" ] || fail \
   "dist/main.cjs does not exist after the build." \
   "The esbuild step did not emit the bundle. Run: npm run build and read its output." \
-  "Check esbuild.config.mjs entryPoints still points at server/index.ts."
+  "Check esbuild.config.mjs entryPoints still points at reference/ledger/server/index.ts."
 
 # ----------------------------------------------------------------------------
-# 2. DEPLOY. We always pass the config paths explicitly (absolute, so the
-#    deploy works from any cwd and never reuses a stale cached relative
-#    path). Capabilities + routes are cheap merges -- re-sending them every
-#    deploy means config changes never silently drift from the repo.
+# 2. DEPLOY. The platform RE-BUILDS the bolt from --source with its own esbuild,
+#    so --source points at the bolt server dir and --entry is RELATIVE to it
+#    (index.ts, not the prebuilt dist/main.cjs). --client-dist is joined onto
+#    --source, so it is the relative hop from the server dir back to client/dist.
+#    Config paths are absolute (work from any cwd). On the FIRST deploy we also
+#    stage the bolt's secrets (--from-secrets): the server-side publish gate
+#    verifies the capabilities' expected secrets exist on the tenant, so a deploy
+#    without them fails. Once staged, later deploys drop the flag automatically.
 # ----------------------------------------------------------------------------
+SRC_REL="reference/ledger/server"
+SECRETS_FILE="$REPO_DIR/.${BOLT_NAME}-secrets.json"
+[ -f "$SECRETS_FILE" ] || SECRETS_FILE="$REPO_DIR/.secrets.json"
+FROM_SECRETS=()
+if [ -f "$SECRETS_FILE" ]; then
+  FROM_SECRETS=(--from-secrets "$SECRETS_FILE")
+  log "staging secrets from $(basename "$SECRETS_FILE") (idempotent; only changed values are written)."
+fi
+
 log "deploying bolt '${BOLT_NAME}' (profile ${PROFILE})..."
 DEPLOY_OUT="$(cd "$REPO_DIR" && raindb-cli --profile "$PROFILE" --timeout 180 lightning bolt deploy \
   --name "$BOLT_NAME" \
+  --engine goja \
+  --source "$SRC_REL" \
+  --entry "index.ts" \
   --capabilities "$REPO_DIR/config/capabilities.json" \
   --routes "$REPO_DIR/config/routes.json" \
   --deployment "$REPO_DIR/config/deployment.json" \
-  --client-dist "client/dist" \
-  --entry "dist/main.cjs" 2>&1)" || {
+  --client-dist "../../../client/dist" \
+  "${FROM_SECRETS[@]}" 2>&1)" || {
   echo "$DEPLOY_OUT" >&2
   case "$DEPLOY_OUT" in
     *401*|*unauthorized*|*Unauthorized*)
@@ -240,20 +257,28 @@ DEPLOY_OUT="$(cd "$REPO_DIR" && raindb-cli --profile "$PROFILE" --timeout 180 li
         "If it persists, check network and try a longer timeout: raindb-cli --profile ${PROFILE} --timeout 600 lightning bolt deploy --name ${BOLT_NAME} ..." \
         "Check the platform status page / endpoint health."
       ;;
-    *"entry"*|*"entrypoint"*|*"main.js"*)
-      fail "bolt deploy rejected the server bundle." \
-        "Confirm dist/main.js exists and config/deployment.json entrypoint matches (dist/main.js)." \
-        "Rebuild cleanly: rm -rf dist && npm run build"
+    *"entry"*|*"entrypoint"*|*"resolve"*)
+      fail "bolt deploy could not resolve the server entry." \
+        "The platform re-bundles from --source (reference/ledger/server) with --entry index.ts." \
+        "Confirm reference/ledger/server/index.ts exists and its imports resolve (a leftover broken import breaks the platform esbuild)." \
+        "Rebuild locally to see the same error: npm run build"
       ;;
     *"routes"*|*"route"*)
       fail "bolt deploy rejected routes.json." \
         "Validate config/routes.json is valid JSON: node -e 'JSON.parse(require(\"fs\").readFileSync(\"config/routes.json\"))'" \
         "Check every SSE route declares streaming:true and paths start with /."
       ;;
+    *"internal server error"*|*"500"*|*secret*|*Secret*)
+      fail "bolt deploy failed -- likely UNSTAGED SECRETS (the publish gate 500s when the capabilities' expected secrets are not on the tenant)." \
+        "Create a secrets file with the names from config/capabilities.json (raindb.secrets.names): .${BOLT_NAME}-secrets.json (gitignored), a flat {\"NAME\":\"value\"} JSON." \
+        "Then re-run scripts/deploy.sh -- it passes --from-secrets automatically when that file exists." \
+        "Verify what is staged: raindb-cli --profile ${PROFILE} lightning secrets list"
+      ;;
     *)
       fail "bolt deploy failed (output above)." \
-        "Re-run by hand for a clean look: raindb-cli --profile ${PROFILE} lightning bolt deploy --name ${BOLT_NAME} --capabilities config/capabilities.json --routes config/routes.json --deployment config/deployment.json --client-dist client/dist --entry dist/main.js" \
-        "Common causes: stale profile key (re-run tenant create), invalid JSON in config/, bolt name collision (git config --local raindb.bolt-name <new>)." \
+        "Re-run by hand for a clean look: raindb-cli --profile ${PROFILE} lightning bolt deploy --name ${BOLT_NAME} --engine goja --source reference/ledger/server --entry index.ts --capabilities config/capabilities.json --routes config/routes.json --deployment config/deployment.json --client-dist ../../../client/dist" \
+        "Common causes: UNSTAGED SECRETS (see below), stale profile key (re-run tenant create), invalid JSON in config/, bolt name collision (git config --local raindb.bolt-name <new>)." \
+        "If it is a 500 with no detail, it is almost certainly missing secrets -- create .${BOLT_NAME}-secrets.json and re-run." \
         "Inspect what the platform has for this bolt: raindb-cli --profile ${PROFILE} lightning bolt info ${BOLT_NAME} -o json"
       ;;
   esac

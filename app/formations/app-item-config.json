@@ -1,0 +1,15 @@
+{
+  "configVersion": 1,
+  "formationId": "app-item",
+  "formationType": "standard",
+  "scopeKey": "itemId",
+  "autoGenId": true,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": ["v1"],
+  "pathTemplate": "entities/app-item/{{.itemId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "indexes": [
+    { "name": "by-id", "template": "indexes/app-item/by-id/{{.itemId}}/latest.json", "type": "pointer", "strategy": "write" },
+    { "name": "by-update", "template": "indexes/app-item/by-update/{{.itemId}}/latest.json", "type": "pointer", "strategy": "write" }
+  ]
+}

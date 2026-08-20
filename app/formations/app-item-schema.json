@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "App Item (v1)",
+  "description": "The one starter formation. Grow it, or add more formations beside it. Each write is an immutable droplet; by-id resolves the current revision, by-update lists newest-first.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["itemId", "text", "createdAt"],
+  "properties": {
+    "itemId": { "type": "string", "format": "uuid" },
+    "text": { "type": "string", "maxLength": 2000 },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}
