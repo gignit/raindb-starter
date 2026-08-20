@@ -594,3 +594,38 @@ This is the corrected scale thesis: RainDB scales like a social platform via O(1
 + token counters (Axis 1), AND gives you a full analytical engine for the rare analytical
 need (Axis 2) -- same data, zero refactor, ever. Describe by capability; never name the
 engine.
+
+## CREXP (production RainDB bolt, ~23k events) -- validated patterns + a strong SDK candidate
+
+crexp README's "30-second mental model" INDEPENDENTLY confirms the two-axis model:
+"The bolt reads two ways: readLatest (by-id index, O(1), always works) for a single
+record, and executeSQL for search/aggregation. Everything joins by id." Exactly Axis 1
+vs Axis 2, stated as the FIRST thing to know in a shipping app. (Note: crexp is an
+INTERNAL repo so it names DuckDB/Parquet in its README -- the STARTER, being
+tenant-facing, must NOT. Good contrast.)
+
+crexp's runSQLFresh (server/index.js:239) is the GOLD-STANDARD two-plane merge -- the
+production answer to the peers' "AI report reads the stale plane" concern:
+1. executeSQL with the `latest` freshness bookmark (columns rows latest{snapshotDropletId
+   currentDropletId indexPrefix ...}).
+2. If a bookmark has snapshotDropletId != currentDropletId (SQL BEHIND), listNewerDropletIds
+   from the update index after the snapshot cursor.
+3. readDropletById each late droplet, PROJECT onto the SQL columns, MERGE late-first
+   (newest), dedupe by scope key, late wins.
+4. harvestAll FALLBACK (runSQLFresh:248): when the formation has NO snapshot yet
+   (freshly published/never pooled) executeSQL ERRORS -> harvest ALL droplets from the
+   by-update index directly so the list works before the first pool.
+Also crexp: retry on transient SQL errors (runSQLWithLatest -- maxAttempts 4,
+isTransientSQLError); config-as-code single file (crexp.config.json profile/env/domain);
+password-gate + JWT session; AI SQL tool (runSqlTool) giving the agent SQL over the data.
+
+=> STRONG SDK CANDIDATE: sql.queryFresh(ctx, {sql, formationId, scopeKey}) in @raindb/
+bolt-sdk -- the two-plane freshness-merge as ONE call (executeSQL+bookmark -> listSince
+newer -> readDroplet -> project+merge, with the no-snapshot harvestAll fallback + the
+transient retry). crexp AND fdn-app both hand-roll this ~60-line construct; it's THE
+"make SQL current" primitive. The bolt-sdk sql binding today is just sql.query
+(+isBehind/needsHarvest freshness helpers) -- queryFresh would compose them into the
+read-your-writes-analytical-read every serious bolt needs. Fill it (it makes the AI
+report's history_sql tool a one-liner AND teaches the pattern by USING it, not
+re-explaining it). Adjudicate the sql binding shape (isBehind/needsHarvest already exist)
+before building.
