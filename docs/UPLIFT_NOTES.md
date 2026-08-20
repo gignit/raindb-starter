@@ -1016,3 +1016,74 @@ DEMONSTRATES real-time fleet-authoritative counters with no broker/cache/second 
 described as "RainDB tokens give you instant atomic counters + live stats, no extra
 infrastructure." One AGENTS "when you need X" row can point at the counter/token pattern.
 The full redis-replacement story belongs to a sibling example (raindb-redis), not the starter.
+
+## FULL FEATURE SET -- FitLedger, a launchable white-label SaaS (operator: build it all)
+
+The starter becomes a DEPLOYABLE PRODUCT (auth-gated) an agent can launch for self / family /
+white-label for a gym. Ledger morphs -> JOURNAL. Workout tracker + journal share one auth'd,
+tokenized infra. Every screen showcases a distinct RainDB pattern. Objective: "clone it, run
+setup, you have a white-labelable workout+journal SaaS at any scale -- no DB, no Redis, no
+broker, no warehouse, no ETL."
+
+AUTH (IAM Layer 1, bolt-sdk README) -- the launch unlock:
+- create user / login: app-users droplet formation, crypto.hashPassword + jwt.sign + cookies,
+  by-email pointer index. EVERY read/write anchored on the authenticated userId (never trust
+  req body -- the #1 SaaS-on-RainDB security rule; the example must teach it exactly right).
+- white-label: an app-config token (gymName, logoUrl, themeColor, inviteOnly). One token drives
+  the brand; owner edits in settings.
+
+REDIS+ TOKEN COUNTERS (the S3-verified pattern, no Redis) -- live stats:
+- community odometer: mutateAndRead on an app-stats token -- total workouts, total sets, total
+  volume (sum weight*reps), entries -- running totals (delta/total fold, the tenant-meter shape
+  I read from S3). Ticks up LIVE. active-this-week via windowed increment on login.
+- per-user streak: a per-user token (mutate currentStreak/longestStreak) -> "12-day streak".
+- rate limit: fleet windowed-INCR limiter on the AI endpoint (protects a gym's LLM budget) --
+  the 680a18b1 pattern.
+
+JOURNAL (the morphed Ledger) -- taggable, optionally client-encrypted, autosaving drafts:
+- CLIENT-SIDE "off-the-grid encryption" (ZERO-KNOWLEDGE, 100% client, Web Crypto -- NOT
+  ctx.crypto): passphrase -> PBKDF2/Argon2 key -> AES-GCM in the BROWSER. Server only ever gets
+  {encrypted:true, ciphertext:<base64>, tags:[...]}. Server/platform NEVER sees plaintext or the
+  passphrase. Stronger than server-side secretFields (data-at-rest) -- nobody can decrypt but the
+  user. (i) explainer: "encrypted on your device before it leaves; we store only scrambled text;
+  lose your passphrase and it's gone forever, by design; never transmitted decrypted." Passphrase
+  in-memory/session only; optional plaintext HINT (never the phrase). Toggle "off-the-grid
+  encryption" on the entry / prompt on entering Journal.
+  HONEST UI: encrypted entries are INVISIBLE to AI + SQL (server-side multi-turn + periscope only
+  see ciphertext). AI can report FREQUENCY/COUNT/TAGS ("12 entries, 4 tagged #anxiety") but CANNOT
+  read/search encrypted CONTENT. => TAGS are the escape hatch (stay plaintext); UI ENCOURAGES
+  tagging encrypted entries so AI can still help ("find my #gratitude entries").
+- DRAFT-AS-TOKEN (anti-upsert-spam, coder-VERIFIED TokenLifecycle formation.go:77): autosave as
+  you type -> a journal-draft token with writeDelay + autoCache (BOTH required; formation.go:150).
+  Keystrokes coalesce in cache, flush once per window -- NOT dozens of droplet revisions
+  (comment: "1000/sec accumulates for WriteDelay, writes once per window"). On PUBLISH: write the
+  immutable journal droplet + DELETE the draft token (vanishes). On abandon: expirationMode fixed
+  -> self-cleans. Encrypted drafts hold ciphertext too (client encrypts before autosave). "Hot
+  ephemeral mutable state = token; durable published fact = droplet" -- a creative raindb showcase.
+
+TAGS-AS-PER-SCOPE-TOKEN (shared shape, natural-path isolation):
+- an app-tags token whose scope/path INCLUDES the domain: scopeKey ~ {userId}:{scope} ->
+  tokens/app-tags/<user>/journal.json vs .../workout.json. SAME formation shape, TWO independent
+  tag ledgers, driven by the natural path/ID. Payload = a JSON enum/array of used tags; adding a
+  tag mutates it in (dedup). UI: "+" -> the list, autocomplete-as-you-type, or expand-to-click.
+  Teaches "a token as a per-scope managed set/enum" (config-as-data spirit).
+
+TWO AXES (core lesson): O(1) grabs (dashboard, last-set prefill, infinite scroll) + analytical
+SQL (personal PR/1RM charts + GYM LEADERBOARD GROUP BY userId "top volume this month / most
+improved bench" -- the white-label payoff + owner DAU/WAU dashboard) + the freshness badge.
+
+REAL-TIME (wire-token SSE + the alerts primitive I built): live gym feed ("Sarah hit a bench
+PR") + unread badge + presence ("3 working out now" via short-TTL presence token).
+
+REVISIONS/FILES (the versioned-float I proved): progress photos with a time-travel slider
+(revisions:true) -- the emotional headline; optional form-check video.
+
+AI (locked, 2-plane, cap tools): gratifying report + "plan my next workout" + NL coach ("am I
+overtraining?" -> deload SQL). Sees only UNENCRYPTED content + tags/frequency for encrypted.
+
+SCOPE NOTE (budget vs operator "build it all"): this is a full product. Keep ONE shared
+persistence/token/feed/AI impl (journal+workout share the tag-token + draft-token + auth). The
+reference/ shows each pattern cleanly; app/ + AGENTS task->file table shows how to extend. Enforce
+readability per file even as feature count grows -- gold-standard = each file obviously-correct.
+Family restraint holds: hint the redis-replacement via the token counters ("instant atomic
+counters + live stats, no extra infra"), never name Redis; the full redis story = sibling example.
