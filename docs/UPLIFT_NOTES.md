@@ -504,3 +504,45 @@ a tracked host+SDK gap. If the operator wants it filled as part of this effort (
 a real ergonomic gap every retryable-write bolt hits), do it as a separate 4-layer
 change with live tests + deploy AFTER the starter is working -- don't block the
 starter on a host deploy. (Surfaced to operator.)
+
+## THE ENGINE, CORRECTLY UNDERSTOOD (operator -- corrects the peers AND me)
+
+The reframe: RainDB transport (droplet in/out) is DELIBERATELY SIMPLE and limited on
+retrieval -- that is JUST the transport. The TRUE power is the SQL engine, which is
+the FULL analytical engine (window functions, CTEs, regression, percentiles, JSON
+functions, list/struct). Coder-verified:
+
+1. THE FORMATION SCHEMA IS THE SQL TABLE SCHEMA. mapJSONSchemaToDuckDB
+   (schema_mapper.go:297) translates JSON Schema types -> engine types directly:
+   integer->BIGINT, number->DOUBLE, date-time->TIMESTAMP, boolean->BOOLEAN. Anything
+   typeable in the schema lands as a native typed column. "Anything you can put in
+   the engine you can put in a formation" -- literally, via the schema.
+2. array/object -> the engine's JSON type (line 313). This is NOT opaque: the engine
+   has the full JSON function suite (->, ->>, json_extract) + inline CAST. So a
+   FREE-FORM `metrics` JSON object IS fully queryable/chartable:
+   CAST(metrics->>'weight' AS DOUBLE) inside any window function. 
+3. The SQL guard (sqlguard.go:39) is a STATEMENT-TYPE whitelist ONLY (SELECT/WITH/
+   VALUES/TABLE) -- it does NOT restrict functions/operators. The ENTIRE engine
+   function surface is available (regr_slope, percentile_cont, JSON ops, everything).
+4. FRESHNESS MERGE is the pattern (not a limitation): the fresh index/cursor loads
+   ONLY the recent not-yet-pooled entries and merges them into the dataset with the
+   pooled parquet -> one COMPLETE current SQL view. Full engine power AND read-your-
+   writes. The "two planes" = one merged surface; the cursor says what fresh tail to
+   overlay.
+
+CORRECTION to the peers (and my earlier note): "free-form metrics can't reach SQL,
+declare canonical columns" is WRONG about capability. Free-form metrics IS queryable
+(JSON column + engine JSON functions). So:
+- Declaring canonical typed columns (weightKg, reps, ...) is now a pure ERGONOMICS
+  choice (terser queries, self-documenting, native typed columns), NOT a capability
+  requirement. KEEP it for the common metrics because it reads cleanly and is the
+  better teaching example -- but the free-form `metrics` JSON is ALSO fully
+  chartable, and the app can demonstrate BOTH: typed columns for the staples, JSON
+  extraction for user-defined exercises with arbitrary metrics. THAT is the real
+  "define any data type and still get full SQL" showcase.
+- The AI report's history_sql tool can query EITHER typed columns OR JSON-extracted
+  user metrics with the full engine -- window functions over CAST(metrics->>'x').
+
+This is the starter's deepest lesson: a formation is a typed table in an infinitely
+scalable analytical engine; the transport is simple, the analytics are limitless;
+freshness-merge keeps it current. Describe by CAPABILITY, never name the engine.
