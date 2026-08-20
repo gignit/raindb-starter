@@ -1,0 +1,77 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "entryId",
+    "authorName",
+    "title",
+    "encrypted",
+    "tags",
+    "createdAt",
+    "updatedAt"
+  ],
+  "properties": {
+    "entryId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "authorName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string"
+    },
+    "body": {
+      "type": "string"
+    },
+    "encrypted": {
+      "type": "boolean"
+    },
+    "ciphertext": {
+      "type": "string"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updatedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revisionNote": {
+      "type": "string"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "encrypted": {
+            "const": true
+          }
+        },
+        "required": [
+          "encrypted"
+        ]
+      },
+      "then": {
+        "required": [
+          "ciphertext"
+        ]
+      },
+      "else": {
+        "required": [
+          "body"
+        ]
+      }
+    }
+  ]
+}

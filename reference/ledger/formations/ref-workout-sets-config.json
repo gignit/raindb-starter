@@ -1,0 +1,132 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-workout-sets",
+  "formationType": "standard",
+  "scopeKey": "setId",
+  "autoGenId": true,
+  "pathTemplate": "entities/ref-workout-sets/{{.setId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-workout-sets/by-id/{{.setId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-category",
+      "template": "indexes/ref-workout-sets/by-category/{{.categoryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "indexes/ref-workout-sets/by-category.desc/{{.categoryId}}/{{.dropletId}}/meta.json",
+        "setsTemplate": "indexes/ref-workout-sets/by-category.sets/{{.categoryId}}/{{.setId}}/meta.json",
+        "carryFields": [
+          "setId",
+          "userId",
+          "categoryId",
+          "categoryName",
+          "categoryPath",
+          "isBenchmark",
+          "recordedAt"
+        ],
+        "latestPointerTemplate": "indexes/ref-workout-sets/by-category.desc/{{.categoryId}}/latest.json"
+      }
+    },
+    {
+      "name": "by-benchmark",
+      "template": "indexes/ref-workout-sets/by-benchmark/{{.userId}}/{{.dropletId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write",
+      "condition": "isBenchmark == true",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "indexes/ref-workout-sets/by-benchmark.desc/{{.userId}}/{{.dropletId}}/meta.json",
+        "setsTemplate": "indexes/ref-workout-sets/by-benchmark.sets/{{.userId}}/{{.setId}}/meta.json",
+        "carryFields": [
+          "setId",
+          "categoryId",
+          "categoryName",
+          "categoryPath",
+          "recordedAt"
+        ],
+        "latestPointerTemplate": "indexes/ref-workout-sets/by-benchmark.desc/{{.userId}}/latest.json"
+      }
+    },
+    {
+      "name": "by-update",
+      "template": "indexes/ref-workout-sets/by-update/{{.setId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "indexes/ref-workout-sets/by-update.desc/{{.dropletId}}/meta.json",
+        "setsTemplate": "indexes/ref-workout-sets/by-update.sets/{{.setId}}/meta.json",
+        "carryFields": [
+          "setId",
+          "userId",
+          "categoryId",
+          "categoryName",
+          "categoryPath",
+          "isBenchmark",
+          "recordedAt"
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "action": "periscope-pool",
+      "trigger": "onDroplet",
+      "metadata": {
+        "tier": "stream"
+      }
+    }
+  ],
+  "queryConfig": {
+    "enabled": true,
+    "flattenDepth": 1,
+    "defaultLimit": 100,
+    "maxLimit": 1000
+  },
+  "tierPolicy": {
+    "partition": {
+      "strategy": "formation"
+    },
+    "catalog": {
+      "location": "periscope/{{.formationId}}/catalog"
+    },
+    "tiers": {
+      "stream": {
+        "enabled": true,
+        "source": {
+          "type": "droplets",
+          "index": "by-update"
+        },
+        "trigger": {
+          "operator": "OR",
+          "next": "*/5 * * * *",
+          "tz": "UTC"
+        },
+        "retainInputs": true,
+        "retention": {
+          "afterSupersession": "30d"
+        }
+      }
+    }
+  },
+  "views": {
+    "defaultBehavior": {
+      "dedup": true
+    },
+    "queryDefaults": {
+      "autoPool": true,
+      "window": "10s"
+    }
+  }
+}

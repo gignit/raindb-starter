@@ -1,0 +1,25 @@
+{
+  "configVersion": 1,
+  "formationId": "ref-users",
+  "formationType": "standard",
+  "scopeKey": "userId",
+  "autoGenId": true,
+  "pathTemplate": "entities/ref-users/{{.userId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": ["v1"],
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-users/by-id/{{.userId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-email",
+      "template": "indexes/ref-users/by-email/{{.email}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ]
+}

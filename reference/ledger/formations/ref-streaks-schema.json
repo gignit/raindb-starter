@@ -1,0 +1,30 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "userId",
+    "counters"
+  ],
+  "properties": {
+    "userId": {
+      "type": "string"
+    },
+    "counters": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "current": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "longest": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "lastActivityDate": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

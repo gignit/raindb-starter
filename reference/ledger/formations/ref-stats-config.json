@@ -1,0 +1,49 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-stats",
+  "formationType": "token",
+  "scopeKey": "statsId",
+  "pathTemplate": "tokens/ref-stats/{{.statsId}}.json",
+  "lifecycle": {
+    "expirationMode": "none",
+    "autoCache": true,
+    "cacheTTL": "30s",
+    "writeDelay": "30s",
+    "wireOpDelayMs": 100
+  },
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-stats/by-id/{{.statsId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ],
+  "stats": {
+    "enabled": true,
+    "keepRunningTotals": true,
+    "fields": [
+      {
+        "name": "workouts",
+        "op": "increment"
+      },
+      {
+        "name": "sets",
+        "op": "increment"
+      },
+      {
+        "name": "volumeKg",
+        "op": "increment"
+      },
+      {
+        "name": "journalEntries",
+        "op": "increment"
+      }
+    ]
+  }
+}

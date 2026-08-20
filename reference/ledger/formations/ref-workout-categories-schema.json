@@ -1,0 +1,55 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "categoryId",
+    "userId",
+    "parentId",
+    "name",
+    "metricSchema"
+  ],
+  "properties": {
+    "categoryId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "parentId": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "categoryPath": {
+      "type": "string"
+    },
+    "sortOrder": {
+      "type": "integer"
+    },
+    "metricSchema": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "fields"
+      ],
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        },
+        "chartHint": {
+          "type": "string"
+        },
+        "benchmarkable": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

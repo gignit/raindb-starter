@@ -1,0 +1,25 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-tags",
+  "formationType": "token",
+  "scopeKey": "tagScopeId",
+  "pathTemplate": "tokens/ref-tags/{{.tagScopeId}}.json",
+  "lifecycle": {
+    "expirationMode": "none",
+    "autoCache": true,
+    "cacheTTL": "1h"
+  },
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-tags/by-id/{{.tagScopeId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ]
+}

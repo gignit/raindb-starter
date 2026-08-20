@@ -1,0 +1,27 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-workout-categories",
+  "formationType": "standard",
+  "scopeKey": "categoryId",
+  "autoGenId": true,
+  "pathTemplate": "entities/ref-workout-categories/{{.categoryId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-workout-categories/by-id/{{.categoryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-parent",
+      "template": "indexes/ref-workout-categories/by-parent/{{.userId}}/{{.parentId}}/{{.categoryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ]
+}

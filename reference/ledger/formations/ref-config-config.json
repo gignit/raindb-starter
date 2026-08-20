@@ -1,0 +1,25 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-config",
+  "formationType": "token",
+  "scopeKey": "configId",
+  "pathTemplate": "tokens/ref-config/{{.configId}}.json",
+  "lifecycle": {
+    "expirationMode": "none",
+    "autoCache": true,
+    "cacheTTL": "1h"
+  },
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-config/by-id/{{.configId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ]
+}

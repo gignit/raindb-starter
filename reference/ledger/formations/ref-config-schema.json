@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "configId"
+  ],
+  "properties": {
+    "configId": {
+      "type": "string"
+    },
+    "appName": {
+      "type": "string"
+    },
+    "logoUrl": {
+      "type": "string"
+    },
+    "inviteOnly": {
+      "type": "boolean"
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

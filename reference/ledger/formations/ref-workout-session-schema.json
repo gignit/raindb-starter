@@ -1,0 +1,36 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "sessionId",
+    "userId",
+    "status",
+    "startedAt"
+  ],
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string"
+    },
+    "startedAt": {
+      "type": "string"
+    },
+    "currentCategoryId": {
+      "type": "string"
+    },
+    "setNumber": {
+      "type": "integer"
+    },
+    "completedCategoryIds": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  }
+}

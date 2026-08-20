@@ -1,0 +1,27 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-streaks",
+  "formationType": "token",
+  "scopeKey": "userId",
+  "pathTemplate": "tokens/ref-streaks/{{.userId}}.json",
+  "lifecycle": {
+    "expirationMode": "none",
+    "autoCache": true,
+    "cacheTTL": "1h",
+    "writeDelay": "30s",
+    "wireOpDelayMs": 100
+  },
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-streaks/by-id/{{.userId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ]
+}

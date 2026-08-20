@@ -1,0 +1,17 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "statsId",
+    "counters"
+  ],
+  "properties": {
+    "statsId": {
+      "type": "string"
+    },
+    "counters": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

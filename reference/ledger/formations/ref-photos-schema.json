@@ -1,0 +1,37 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "photoId",
+    "userId",
+    "imageContentType",
+    "imageFilename",
+    "capturedAt"
+  ],
+  "properties": {
+    "photoId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "caption": {
+      "type": "string"
+    },
+    "capturedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "image": {
+      "type": "string",
+      "contentEncoding": "base64"
+    },
+    "imageContentType": {
+      "type": "string"
+    },
+    "imageFilename": {
+      "type": "string"
+    }
+  }
+}

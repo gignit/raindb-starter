@@ -1,0 +1,112 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-journal",
+  "formationType": "standard",
+  "scopeKey": "entryId",
+  "autoGenId": true,
+  "pathTemplate": "entities/ref-journal/{{.entryId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-journal/by-id/{{.entryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-author",
+      "template": "indexes/ref-journal/by-author/{{.authorName}}/{{.entryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "indexes/ref-journal/by-author.desc/{{.authorName}}/{{.dropletId}}/meta.json",
+        "setsTemplate": "indexes/ref-journal/by-author.sets/{{.authorName}}/{{.setId}}/meta.json",
+        "carryFields": [
+          "entryId",
+          "authorName",
+          "title",
+          "encrypted",
+          "tags",
+          "updatedAt",
+          "revisionNote"
+        ],
+        "latestPointerTemplate": "indexes/ref-journal/by-author.desc/{{.authorName}}/latest.json"
+      }
+    },
+    {
+      "name": "by-update",
+      "template": "indexes/ref-journal/by-update/{{.entryId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "indexes/ref-journal/by-update.desc/{{.dropletId}}/meta.json",
+        "setsTemplate": "indexes/ref-journal/by-update.sets/{{.setId}}/meta.json",
+        "carryFields": [
+          "entryId",
+          "authorName",
+          "title",
+          "encrypted",
+          "tags",
+          "updatedAt",
+          "revisionNote"
+        ]
+      }
+    }
+  ],
+  "actions": [
+    {
+      "action": "periscope-pool",
+      "trigger": "onDroplet",
+      "metadata": {
+        "tier": "stream"
+      }
+    }
+  ],
+  "queryConfig": {
+    "enabled": true,
+    "flattenDepth": 1,
+    "defaultLimit": 100,
+    "maxLimit": 1000
+  },
+  "tierPolicy": {
+    "partition": {
+      "strategy": "formation"
+    },
+    "catalog": {
+      "location": "periscope/{{.formationId}}/catalog"
+    },
+    "tiers": {
+      "stream": {
+        "enabled": true,
+        "source": {
+          "type": "droplets",
+          "index": "by-update"
+        },
+        "trigger": {
+          "operator": "OR",
+          "next": "*/5 * * * *",
+          "tz": "UTC"
+        },
+        "retainInputs": true,
+        "retention": {
+          "afterSupersession": "30d"
+        }
+      }
+    }
+  },
+  "views": {
+    "defaultBehavior": {
+      "dedup": true
+    },
+    "queryDefaults": {
+      "autoPool": true,
+      "window": "10s"
+    }
+  }
+}

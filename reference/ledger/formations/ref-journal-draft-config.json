@@ -1,0 +1,28 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-journal-draft",
+  "formationType": "token",
+  "scopeKey": "draftId",
+  "pathTemplate": "tokens/ref-journal-draft/{{.draftId}}.json",
+  "lifecycle": {
+    "autoCache": true,
+    "cacheTTL": "30s",
+    "writeDelay": "30s",
+    "wireOpDelayMs": 100,
+    "expirationMode": "fixed",
+    "expirationDuration": "24h"
+  },
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-journal-draft/by-id/{{.draftId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "setId",
+    "userId",
+    "sessionId",
+    "categoryId",
+    "categoryName",
+    "categoryPath",
+    "isBenchmark",
+    "recordedAt"
+  ],
+  "properties": {
+    "setId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "sessionId": {
+      "type": "string"
+    },
+    "categoryId": {
+      "type": "string"
+    },
+    "categoryName": {
+      "type": "string"
+    },
+    "categoryPath": {
+      "type": "string"
+    },
+    "weightKg": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "reps": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "distanceM": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "durationS": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "avgHeartRateBpm": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0
+    },
+    "elevationM": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "rpe": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "minimum": 0,
+      "maximum": 10
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "isBenchmark": {
+      "type": "boolean"
+    },
+    "recordedAt": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

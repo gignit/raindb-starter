@@ -1,0 +1,53 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-photos",
+  "formationType": "standard",
+  "scopeKey": "photoId",
+  "autoGenId": true,
+  "pathTemplate": "entities/ref-photos/{{.photoId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-photos/by-id/{{.photoId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-user",
+      "template": "indexes/ref-photos/by-user/{{.userId}}/{{.photoId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write",
+      "descIndex": {
+        "enabled": true,
+        "entryTemplate": "indexes/ref-photos/by-user.desc/{{.userId}}/{{.dropletId}}/meta.json",
+        "setsTemplate": "indexes/ref-photos/by-user.sets/{{.userId}}/{{.setId}}/meta.json",
+        "carryFields": [
+          "photoId",
+          "userId",
+          "caption",
+          "capturedAt"
+        ],
+        "latestPointerTemplate": "indexes/ref-photos/by-user.desc/{{.userId}}/latest.json"
+      }
+    }
+  ],
+  "floatConfig": {
+    "enabled": true,
+    "fields": [
+      {
+        "sourceField": "image",
+        "contentTypeField": "imageContentType",
+        "filenameField": "imageFilename",
+        "pathTemplate": "floats/ref-photos/{{.photoId}}/{{.imageFilename}}",
+        "stripAfterFloat": true,
+        "downloadDisposition": "inline",
+        "revisions": true
+      }
+    ]
+  }
+}

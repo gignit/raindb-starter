@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "tagScopeId",
+    "userId",
+    "scope",
+    "tags"
+  ],
+  "properties": {
+    "tagScopeId": {
+      "type": "string"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "journal",
+        "workout"
+      ]
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    }
+  }
+}
