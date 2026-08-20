@@ -708,3 +708,32 @@ HOW THIS SHAPES THE STARTER = RESTRAINT (subtraction, not addition):
 DESIGN PRINCIPLE: showcase enough to earn "more than meets the eye," OPEN THE DOOR to the
 siblings, don't drown them. The starter's job is to make an agent FEEL the foundation is
 deep, then hand off. Describe by capability; never name the engine.
+
+## LEAD-ENGINEER POSITIONS (pre-peer, my stance to adjudicate against)
+
+Convened codex+claude for a BUILD-PLAN deliberation (not re-litigating settled design).
+My positions going in, coder-grounded:
+
+1. SEQUENCING: build sql.queryFresh FIRST. CODER-CONFIRMED it's the lowest-risk primitive:
+   bolt-sdk sql.query({sql,formationId,withFreshness:true}) already returns .latest
+   bookmarks (saw the exact shape live on crexp), needsHarvest() already exists, and the
+   sql.query doc-comment (sql.ts:316) SPELLS OUT the algorithm: listKeys({prefix:
+   bm.indexPrefix, after: bm.snapshotDropletId}) -> readDroplet each -> merge newest-wins.
+   So queryFresh = ~40 lines composing EXISTING LIVE bindings (sql.query + listKeys/
+   listSince + readDroplet + needsHarvest) -- NO new host binding, NO graphql. Build it,
+   then formations, then bolt server bottom-up (persistence already uses the primitives),
+   then routes/ai/config/client/app/scripts/docs, then deploy+e2e. De-risk FIRST: a
+   HELLO-WORLD bolt deploy to vector-sandbox1 (prove the deploy+route+static path works)
+   BEFORE building the full app -- catch env/deploy issues on 30 lines, not 2000.
+2. SCOPE: keep BOTH pillars but entries=FOUNDATION (teaches the core grab/revision/feed
+   primitives simply), workouts=SHOWCASE (the sticky hook + the analytical wow). If it
+   gets too big, the workout CLIENT can be the richer surface while entries stays minimal.
+3. queryFresh: BUILD (lean confirmed by coder -- it's cheap + teaches by using).
+4. writeDroplet-with-opts: SKIP for the starter (use writeBatch single = native
+   idempotency today); track the 4-layer host change as a separate task.
+5. BIGGEST FRESH-CLONE RISK (my bet): the graphql-secret staging for files.reserveUpload
+   (RAINDB_GRAPHQL_ENDPOINT/KEY) + the egress allowlist -- if setup.sh doesn't stage both
+   + capabilities doesn't allowlist the host, the FIRST upload 500s. MITIGATION (claude's
+   earlier point): /api/health does a REAL graphql reserve round-trip (reserve+abandon) so
+   it fails LOUD at setup, not at first upload. Verify this in the health route.
+Await peers; adjudicate; then BUILD.
