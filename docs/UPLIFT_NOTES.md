@@ -779,3 +779,63 @@ ONE ledger revision, ONE versioned-file round trip -- prove clean-clone deploy o
 persistence -> routes -> ai/chat.ts (two-plane) -> config -> client -> app skeleton -> scripts
 -> docs. (4) chrome-devtools e2e. Keep both pillars (entries=foundation, workouts=showcase,
 ONE shared persistence/feed/history/AI impl -- Ledger must not become a 2nd deep app).
+
+## CLAUDE BUILD REVIEW + FINAL ADJUDICATED PLAN (both peers convened; I accept all, lead-eng)
+
+Claude's corrections (ACCEPT all -- coder/experience-grounded):
+1. SEQUENCE FIX: formations BEFORE queryFresh (I had it backwards). Validator killed the
+   old starter -> publish ref-* FIRST (rejection reshapes everything). AND queryFresh's
+   hardest branch (no-snapshot harvestAll fallback) is ONLY testable against a freshly-
+   published never-pooled formation -- which exists only AFTER formations publish. Build
+   queryFresh first = test against nothing.
+2. EXTEND THE HARD GATE TO REPLACE (before any app code): passed gate proved CREATE (v1).
+   The headline is v2 -- upload 2nd file w/ expectedPriorDropletId, assert DISTINCT ver/<v2>/
+   path AND v1 bytes still read. Replace/regeneration leg has known sharp edges create-pass
+   doesn't prove. 10-min curl. If v2 doesn't regenerate cleanly -> degrade to entity-chain-only
+   (reshapes routes/client) so KNOW NOW.
+3. SEED SCRIPT is a required build item: fresh clone = zero history = empty charts + vacuous
+   AI report + non-deterministic e2e. Seed ~8 weeks workout data + a few ledger entries in
+   reference/ setup.
+4. MECHANICAL ENFORCEMENT + ISOMORPHIC app/: pre-commit hook REJECTS reference/ edits unless
+   ALLOW_REFERENCE_EDITS=1 (agents respect hard fails, skim prose). app/ STRUCTURALLY
+   ISOMORPHIC to reference/ (same filenames/layout) + GREEN (one example entity wired end-to-
+   end: formation->persistence->route->one client call), NOT empty -- so every move is a
+   path-for-path transplant, not a wholesale copy. Deploy BOTH bolts, unambiguous names
+   (ledger-reference vs the app's). README ~20 lines -> AGENTS.md; AGENTS.md opens with the
+   2-dir rule then a TASK->FILE TABLE (version history->reference/.../history.ts, etc.), not
+   narrative.
+5. OVERWHELM CUTS (structure not features): axis badges in every route/persistence header
+   (// AXIS 1: O(1) grab / // AXIS 2: analytical SQL) + a client axis badge per panel = the
+   two-axis lesson teaches itself, no essay. Cap AI at EXACTLY 3 tools (session_fresh,
+   history_sql, version_history). ONE JSON-extraction example (in the AI report), charts on
+   typed columns. NO benchmark-browsing UI (keep by-benchmark index v1, ship no screen).
+   HARD BUDGET: reference/ledger/server <= ~10 files, <=150 lines each, readable in one
+   sitting -- enforce like a test. Family-of-examples = exactly one AGENTS table row per
+   sibling, zero code.
+6. FRESH-CLONE LOUD-FAIL: setup.sh after publish runs formation describe + ASSERTS
+   capabilities.revision.enabled for the versioned field; if absent -> exit "this env does
+   not support revisions:true; use <env> or drop the file pillar." Named setup-time failure
+   for the platform-drift class that killed the old starter. (Plus the graphql-secret health
+   round-trip already locked.)
+Verify-during-build (not redesign): (a) the replace-flow gate; (b) writeBatch(single) goja
+host actually threads the per-item idempotency key -- one live double-submit test before
+relying on it (fallback: setId-as-identity, already noted).
+
+### FINAL SEQUENCE (locked, lead-adjudicated):
+0. SDK dep closure: merge bolt-sdk feat/files-graphql-fallback -> main (no-ff) + tag/publish;
+   pin the starter dep to the SDK SHA. (codex: THE fresh-clone break.)
+1. Extend the HARD GATE to the v2 replace flow (curl, before app code). (claude)
+2. WALKING SKELETON on vector-sandbox1: clone-into-empty-dir, setup/config/secrets, publish
+   ref-* formations (LOUD-fail: validator verbatim + assert capabilities.revision.enabled),
+   deploy a tiny goja bolt, /api/health real reserve round-trip, one idempotent set, one
+   ledger revision, one v1+v2 file round trip. Prove clean-clone deploy on ~30 lines.
+3. sql.queryEntityRowsFresh (row-list only, fail-LOUD on harvest error) -- live-test against
+   the pre-pool then post-pool formation.
+4. Seed script (~8wk workouts + ledger entries).
+5. Expand: full formations -> persistence -> routes (axis-badged) -> ai/chat.ts (2-plane, 3
+   tools) -> config -> client (axis badges) -> app/ isomorphic-green skeleton -> pre-commit
+   hook + scripts + remove-reference.sh -> README+AGENTS (task->file table).
+6. chrome-devtools e2e (create/edit/restore, v1+v2 upload+versioned download, feed+unread,
+   AI report, SQL charts, retroactive PR).
+Budget enforced; both pillars (entries=foundation, workouts=showcase, ONE shared persistence/
+feed/history/AI impl). Commit+push frequently. Adjudicated -- proceeding to build.
