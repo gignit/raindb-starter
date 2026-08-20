@@ -1341,3 +1341,16 @@ gate the overall RESULT:FAIL but are orthogonal to my probes.
 - files.reserveUpload: no float formation in the harness -> API 500 "internal server error" (the graphql
   route WORKED -- reached+authenticated). FIX: kind:'negative', a reachable rejection = binding proven
   (happy path proven in M2 vs ff-photos float formation).
+
+## M1.4 STATUS: 5/6 primitives GREEN on runtime; versionHistory = tracked SDK investigation
+GREEN (goja==pod ok): sql.queryEntityRowsFresh, token.delete, iam.mintActivitySubscription,
+files.reserveUpload, startSSE.buffered. All 5 proven on the real bolt runtime.
+OPEN: db.versionHistory returns revisions:0 even though wrote:true (both writes returned distinct
+dropletIds, raw S3 confirms entities/sdktest-notes/<uuid-scope>/.../<dropletId>.json exists).
+CODER-VERIFIED FACTS: versionHistory -> listDroplets({prefix:`${scopeValue}/`}, db.ts:742) -> host
+boltDB.ListDroplets (sdk_impl.go:546) -> ListFormationDroplets{Prefix: relative intra-entity
+narrowing}. The db.listDroplets probe (NO prefix) passes; versionHistory is the FIRST consumer of
+prefix-narrowing on this runtime and returns 0. So the suspect is prefix-narrowing (trailing-slash
+scopeValue?) NOT the primitive logic (unit-tested). This is a genuine SDK finding the harness caught.
+DECISION (lead): defer as a tracked SDK investigation -- 1 probe, not app-blocking (app can list +
+client-filter, or fix the SDK prefix). Delegate the trace to codex. Do NOT block M1 on it.
