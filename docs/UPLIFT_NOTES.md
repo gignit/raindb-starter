@@ -629,3 +629,47 @@ read-your-writes-analytical-read every serious bolt needs. Fill it (it makes the
 report's history_sql tool a one-liner AND teaches the pattern by USING it, not
 re-explaining it). Adjudicate the sql binding shape (isBehind/needsHarvest already exist)
 before building.
+
+## LIVE VALIDATION -- RainDB MCP against crexp prod (~23k events). Model CONFIRMED empirically.
+
+Ran the RainDB MCP against the live crexp tenant (4e1392d1..., prod api.raindb.io).
+Both axes + freshness + cascade observed working on real production data:
+
+AXIS 2 (analytical engine) -- REAL, FULL, FAST:
+- GROUP BY over ~23k events in 241ms: Land 7775 events/4835 sales avg $5.09M,
+  Retail 3946 (max sale $4.925 BILLION -- a CVS in Phoenix), Industrial 3129 avg
+  $8.4M, Multi Family 2105 avg $24.1M, Hospitality 194 avg $27.7M.
+- WINDOW FUNCTIONS + CTE in 82ms: ROW_NUMBER() OVER (PARTITION BY propertyType
+  ORDER BY magnitude DESC) + PERCENT_RANK() OVER (ORDER BY magnitude) -> top sale
+  per type + its overall percentile. THIS IS EXACTLY the workout PR-detection query
+  shape (MAX/ROW_NUMBER OVER PARTITION BY exercise). Confirmed the full engine is live.
+- Every result carried the freshness bookmark: latest[]{snapshotDropletId,
+  currentDropletId, indexPrefix, freshnessStatus:"CURRENT"} -- snapshot==current so
+  no merge needed. This IS the input crexp's runSQLFresh keys on.
+
+AXIS 1 (O(1) grab) -- instant, no SQL, strongly consistent:
+- droplet_read_latest by-id/850216 -> full event droplet in one pointer read
+  (dropletId 019fcf13..., the $4.9B CVS). Same cost at 23k or 23B records.
+- droplet_keys by-update first:3 onePage -> newest-first page + opaque cursor =
+  the infinite-scroll/descIndex feed primitive, O(pageSize).
+
+CASCADE (never-refactor auto-datalake) -- OBSERVED:
+- periscope_status: vizzda-events stream/river/lake all OK, behind:false,
+  dropletsAhead:0 (fully pooled). vizzda-event-document shows COMPACTION cascade
+  visibly: stream snapshotCount 45 -> river 11 -> lake 4 (files reduce as data flows
+  up tiers). This is the "droplets auto-flow into the datalake" thesis, live.
+
+Schema lesson CONFIRMED by a production formation: vizzda-events stores money/size
+as typed number|null columns and its OWN schema description says "so periscope/SQL
+can aggregate them directly" -- exactly the canonical-typed-columns design the peers
++ I landed on. magnitude(number), recordedTs(integer unix-ms for range filtering).
+
+Also observed: by-city is a multi-segment index ({city}/{eventId}/) so read-latest
+with just a city ERRORS -- read-latest is for SINGLE-pointer indexes (by-id). A
+multi-segment lookup uses listKeys with a prefix. (Starter lesson: match the read
+verb to the index arity.)
+
+NET: the model is not theory -- I watched it run on 23k prod records. The starter can
+confidently teach: O(1) grab for interactive reads (any scale), the full analytical
+engine for real analytics (window fns/CTE/percentiles), freshness bookmark to merge
+the fresh tail, auto-cascade compaction. Describe by capability; never name the engine.
