@@ -61,6 +61,9 @@ export interface Entry {
   body: string;
   status: "draft" | "active" | "archived";
   tags?: string[];
+  // True when body holds client-side ciphertext (zero-knowledge). The server
+  // stores it opaquely; only the client can decrypt with the passphrase.
+  encrypted?: boolean;
   createdAt: string;
   updatedAt?: string | null;
   revisionNote?: string | null;
@@ -107,6 +110,7 @@ export async function createEntry(input: {
   body: string;
   status?: Entry["status"];
   tags?: string[];
+  encrypted?: boolean;
 }): Promise<Entry> {
   const now = new Date().toISOString();
   const entry: Entry = {
@@ -116,6 +120,7 @@ export async function createEntry(input: {
     body: input.body,
     status: input.status ?? "active",
     tags: input.tags ?? [],
+    encrypted: input.encrypted ?? false,
     createdAt: now,
     updatedAt: null,
     revisionNote: null,
@@ -131,7 +136,7 @@ export async function createEntry(input: {
  */
 export async function editEntry(
   entryId: string,
-  changes: Partial<Pick<Entry, "authorName" | "title" | "body" | "status" | "tags">>,
+  changes: Partial<Pick<Entry, "authorName" | "title" | "body" | "status" | "tags" | "encrypted">>,
   revisionNote?: string,
 ): Promise<Entry | null> {
   const current = await readEntry(entryId);

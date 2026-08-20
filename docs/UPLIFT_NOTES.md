@@ -1434,3 +1434,49 @@ history/restore, AI report (needs LLM creds valid), mobile viewport responsive c
 PLATFORM GAPS LOGGED (file upstream): (a) ctx.db.writeToken should return the full envelope
 (scopeValue), like writeDroplet -- goja host returns only dropletId. (b) deploy 500s (not 400) when
 capabilities' expected secrets aren't staged.
+
+## DATA-MODEL STUDY (read raindb-app + crexp configs+schemas IN FULL, one by one) -- corrections
+
+Read complete configs AND schemas (no parsing): platform_user, fdn_documents, vizzda-events,
+vizzda-rolodex. What the working models do that I got wrong:
+
+CONFIG = capabilities/mechanics for incoming droplets (NOT just indexes):
+- actions[] drive pipelines on write: fdn_documents {action:"digest",trigger:"onDroplet"} kicks
+  extraction/embedding; every SQL formation has {action:"periscope-pool",trigger:"onDroplet",
+  metadata:{tier:"stream"}}. The config controls the cascade.
+- tierPolicy is the FULL 3-tier cascade, copied verbatim across crexp formations: stream(src
+  droplets/by-update, next */5, retainInputs, afterSupersession 30d) -> river(src tier:stream,
+  */30, 90d) -> lake(src tier:river, 0 */6, 365d) + catalog{location} + expiration{daily,30d} +
+  defaultPartition{strategy:"formation"}. views{defaultBehavior{dedup:true}, queryDefaults
+  {autoPool:true, window:"10s"}}. This is the exact block to reuse (mine was close; match this).
+- pathTemplate can PARTITION by a domain dimension for scale: vizzda-events
+  entities/vizzda-events/{{.propertyType}}/{{.yyyy}}/... (partition by propertyType). rolodex is
+  entities/vizzda-rolodex/{{.contactId}}/{{.dropletId}}.json (per-entity). Choose per formation.
+- latestUpdatePointer:true (vizzda-events) maintains the latest-update pointer (freshness bookmark).
+- autoGenId:false + caller supplies the scopeKey (vizzda-events eventId, rolodex contactId), OR
+  autoGenId:true and the platform mints it (fdn_documents documentId, platform_session sessionId).
+
+INDEXES = access paths (one per query pattern), composite {dimension}/{scopeId}/latest.json:
+- crexp scopes reads by MANY dimensions: by-property, by-property-type, by-city -- each
+  indexes/<f>/by-X/{{.X}}/{{.eventId}}/latest.json. This is the model for by-user/{userId}/{id}.
+- by-id (pointer, single {scopeId}/latest.json) for O(1) current.
+- by-update (pointer + descIndex entryTemplate/latestPointerTemplate/setsTemplate, leaf
+  {{.dropletId}}) = newest-first feed AND the periscope source index.
+- raindb-app fdn_documents has ONLY by-id (ownership via denormalized projectId on payload +
+  vector metadata filter, not a by-user index) -- so ownership scoping is DOMAIN-dependent:
+  either a by-<owner> index OR a denormalized owner field filtered in SQL/vector. Both valid.
+
+SCHEMA = the SQL table columns (typed):
+- money/size/metrics = ["number","null"] so SQL aggregates directly (crexp says so explicitly);
+  a parallel numeric <x>Ts (["integer","null"] unix-ms) beside any human date string for SQL
+  range/sort (recordedTs). => sets should carry recordedTs (unix-ms), not rely on CAST(... DATE).
+- fields used in a path/index template are required + non-empty (blanks normalized to 'Unknown'),
+  else the index entry is skipped with a warning (the live warning I saw).
+- required[] is MINIMAL (scope key + index-key fields + essentials); everything else nullable.
+  (My over-broad required + additionalProperties:false silently dropped `encrypted` -- wrong.)
+- denormalize the owner/scope + display fields onto the payload (projectId "denormalized here for
+  search scoping"; uploadedBy the actor) so a row is self-describing + filterable.
+- ownership recorded as DATA (uploadedBy) AND enforced by reading within the owner's index scope.
+
+REUSE (not fork): the whole tierPolicy+actions+views block is identical boilerplate -> one shared
+constant. Per-formation choices: scopeKey, autoGenId, pathTemplate partition dim, the index set.
