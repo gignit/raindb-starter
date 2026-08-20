@@ -483,3 +483,24 @@ first -- sdk_impl.go WriteDroplet host signature), because every bolt author wri
 a retryable entity hits this. Verify the goja host WriteDroplet can carry opts before
 committing to (b); if the host is fixed-opts, (a) writeBatch is the answer + a noted
 future host gap.
+
+## writeDroplet-with-opts: coder-verified scope of the fix (DECISION POINT)
+
+Traced the host WriteDroplet (coder):
+- internal/lightning/sdk_impl.go:501 -- boltDB.WriteDroplet ALREADY builds a
+  types.WriteOptions{Author:"bolt:"+boltID, TriggerFlows:true} but hardcodes it;
+  the underlying client.WriteDroplet fully supports IdempotencyKey/ExpectedETag.
+- podchannel/dispatch.go:176 + goja bindings.go read only {formationId, payload}.
+So filling "writeDroplet with opts" = a 4-LAYER host+SDK feature:
+  (1) runtime SDKDatabase.WriteDroplet signature (+opts)
+  (2) sdk_impl.go boltDB.WriteDroplet: merge caller opts into the WriteOptions
+  (3) BOTH dispatch paths (goja bindings.go + pod dispatch.go) read opts from args
+  (4) bolt-sdk db.ts wrapper: WriteDropletInput + opts
+  + live tests + a raindb-prime deploy. Larger than the pure-TS SDK augmentations.
+
+DECISION: For the STARTER, use db.writeBatch(single item) -- it exposes per-item
+idempotency, is native TODAY, needs no host change. Record writeDroplet-with-opts as
+a tracked host+SDK gap. If the operator wants it filled as part of this effort (it IS
+a real ergonomic gap every retryable-write bolt hits), do it as a separate 4-layer
+change with live tests + deploy AFTER the starter is working -- don't block the
+starter on a host deploy. (Surfaced to operator.)
