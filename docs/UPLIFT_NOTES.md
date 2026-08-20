@@ -1233,3 +1233,57 @@ ALSO: the gosdk tier (Go live-SDK, ListCounter round-trip COUNT) proves platform
 use it for the draft-coalescing "N writes -> few S3 PUTs" COST contract that a probe (which sees
 values, not S3 PUT counts) cannot. So a primitive may get BOTH: a bolt probe (behavior on the real
 runtime) + a gosdk count contract (S3 cost). Both augment the harness for the next agent.
+
+## THE MASTER KEY (operator, SACRED) -- prove the GRAPHQL SHAPE first; everything follows
+
+The GraphQL op is the ROOT authority. Prove the capability's GraphQL shape FIRST in the Python
+live tier (tests/live/tests/), cross-checked vs raw S3 -- that PINS the contract. Every other
+surface (bolt-sdk ctx.*, @raindb/agent tools, CLI, MCP) is a DIFFERENT REPRESENTATION of that
+same GraphQL op. Once the GraphQL test is green, the SDK probe/wrapper is a thin re-representation
+that FOLLOWS SUIT. My earlier sequencing was backwards. Correct order PER CAPABILITY:
+  1. Prove the GraphQL op in tests/live/tests/ (Python) vs raw S3 -> pins the contract.
+  2. THEN the bolt-sdk probe (raindb-test-lightning-goja) = the same op over ctx.*; the SDK unit
+     test is just the wrapper logic.
+This is why codex led with the GraphQL op shapes -- they are the roots.
+
+## CODEX PATTERN A/B RESEARCH -- adjudicated (coder-cited; I re-verified the pivotal one)
+
+Pattern A (counter token):
+- Op shapes (coder): windowed INCR mutate = {kind:"windowIncrement", countPath, windowStartPath,
+  windowMs, by, nowMs} + readPaths:["counters.window.count"]; running total = increment + move(reset)
+  fold; mergeTs auto-stamped on eviction drain. (interfaces.go:345, json_ops.go:474, stats.go)
+- USE mutateAndRead (fleet-true) NOT plain mutate for rate-limit/streak/odometer (plain mutate is
+  deliberately drop-tolerant -- token.go:1257; commit 65c064b8). __concurrency.priorETag is
+  server-stamped, not caller input.
+- DON'T use tenant-meter itself (admin-owned, tenant-read-only). Make an APP-OWNED token formation
+  with the same lifecycle (autoCache:true + writeDelay + running totals + arbitrary counters schema).
+- lib/ HAS: mutate/mutateAndRead/writeToken query docs (queries.py:139), ensure_token
+  (provision.py:448), warm_counter_owner (mutate.py:12), token S3-key oracle + atomic-INCR assert
+  (verify/counters.py), test_mutate_concurrent proving coalescing. EXTEND: _generic_formation_ready
+  ignores `stats` (stale-config reuse bug, provision.py:130); add windowed/fold oracles to
+  verify/counters.py + driving plumbing to mutate.py.
+
+Pattern B (draft token) -- 2 CORRECTIONS I accept:
+1. DELETE path = GraphQL deleteToken(input:DeleteTokenInput!{formationId, scopeValue}):
+   EntityActionResult!{formationId,scopeValue,success} (coder-CONFIRMED, schema.graphqls:3108,
+   @requireScope write). NOT expireDroplet (wrong bucket -- tokens in the token bucket). NOT TTL
+   alone (can't prove "vanishes on publish"). deleteToken is idempotent when absent (token.go:678).
+   => bolt-sdk token.delete is a STUB -> make it LIVE via boltGraphQL (mirror the files augmentation,
+   graphql.ts already exists). A real SDK gap to fill.
+2. Autosave = db.mutate (set ops), NOT repeated writeDroplet (repeated writeDroplet gets NO
+   write-delay coalescing). Draft flow: writeDroplet-once (Go redirects token formations to
+   WriteToken, write.go:95) -> autosave db.mutate -> publish droplet -> deleteToken.
+   Keep the draft formation INDEXLESS (associated-index cleanup on delete is best-effort).
+
+Count tooling: ListCounter counts LISTs not PUTs (harness.go:98). For the "N mutations -> 1 S3 PUT"
+COST contract add a test-only PutCounter wrapping storage.S3Writer, filtered to the token key,
+injected into objects.NewObjectCache. writeDelay>0-requires-autoCache is a RUNTIME rule (rejected in
+Mutate/MutateAndRead), NOT a publish-validator rule yet (formation.go:150 marks it future work).
+
+PHASE 1 REORDERED (GraphQL-shape-first): (1) queryEntityRowsFresh -- its GraphQL roots (executeSQL
++freshness test_freshness.py, listSince test_list_since.py) are ALREADY GREEN; prove the MERGE
+behavior via the probe. (2) counter token: prove windowIncrement/increment/move + mutateAndRead
+GraphQL vs raw-S3 (extend counters.py) -> then probe. (3) draft token: prove deleteToken +
+mutate-coalescing GraphQL vs raw-S3 -> fill token.delete in the SDK -> probe. (4) files/startSSE/
+mintActivitySubscription/versionHistory: GraphQL roots mostly proven (reserveDirectUpload/readFloat,
+listSince, mintWireSubscribeToken, listDroplets) -> probes.
