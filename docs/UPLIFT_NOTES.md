@@ -1164,3 +1164,33 @@ TANDEM SPLIT (same machine/repo -- ONE task at a time to codex, I peer-review, t
   reporting findings, NOT editing.
 Then I peer-review codex's research, give it the next (implementation) task, and iterate --
 2x throughput, contracts as the sync point.
+
+## THE THREE-LAYER DISCIPLINE (operator, SACRED) -- reusable logic at its lowest correct home
+
+The framework-first rule applies across THREE layers, each feeding the one below; each layer
+adds ONLY what is unique to it. Any hand-rolled useful thing is classified + pushed DOWN:
+
+LAYER 1 -- the SDKs (raindb-bolt-sdk-ts / raindb-agent-ts): the reusable CAPABILITY/PRIMITIVE.
+  Anything hand-rolled that is a genuine RainDB capability (an app OR a test would want it)
+  lives HERE as a first-class helper -- NOT in the test framework, NOT in the app. So every
+  bolt author gets it. (Already did: files.reserveUpload/versionHistory/startSSE/
+  mintActivitySubscription/boltGraphQL. Phase 1: sql.queryEntityRowsFresh + counter/draft
+  helpers go in the SDK if they are real capabilities.)
+
+LAYER 2 -- tests/live/lib/: thin HELPERS that USE the SDK primitive + verification/ORACLE
+  logic. lib/ does NOT reimplement the capability -- it CALLS the SDK primitive and adds the
+  test-unique scaffolding: provision the fixture, cross-check vs RAW S3 (the oracle), assert
+  the contract, record.contract. The oracle + assertions are the testing-unique part.
+
+LAYER 3 -- the test: MINIMAL assertions + intent only. Calls the lib/ helper (which calls the
+  SDK primitive). Only "what should be true." No plumbing, no capability logic, no query text.
+
+CLASSIFY every hand-rolled thing: is it a RainDB CAPABILITY? -> SDK (layer 1). Is it
+verification/oracle/provision PLUMBING? -> lib/ (layer 2). Is it an ASSERTION of intent? ->
+the test (layer 3). Nothing reusable is ever stranded in an app file or a test file.
+
+RESULT (the purpose): the SDK becomes eventually-PERFECT and the test framework eventually-
+COMPLETE as a BYPRODUCT of writing minimal tests. Tandem rule: when codex or I hand-roll
+something, FIRST question = "which layer owns this?" -> it goes there, WITH a caller, never
+copy-pasted. This is why the whole effort compounds: each pattern proven leaves the SDK +
+the harness both richer for the next agent.
