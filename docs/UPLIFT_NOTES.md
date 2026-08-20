@@ -1130,3 +1130,37 @@ Phase-1 primitives to prove THIS way (each -> a lib/ helper, not a one-off):
   helper asserting two independent tag ledgers from one formation.
 - revisions:true v1+v2 replace -> extend the existing float/revisions verify (search first).
 Merge bolt-sdk feat->main + pin AFTER the primitives are green in tests/live.
+
+## PHASE 1 FRAMING (Refactor Contract applied) -- lead-eng plan + tandem split
+
+Most Phase-1 work is NOT a platform refactor -- the primitives EXIST (mutateAndRead,
+writeDelay tokens, per-scope tag tokens, revisions:true, the freshness bookmark). Phase 1 =
+PROVE they behave as the app needs by writing RED-FIRST live contracts against the REAL
+production path + AUGMENTING tests/live lib/ with reusable helpers (the "augment the harness
+for the next agent" pattern, worked-example section 6/8) + cross-check vs raw S3. The 2
+genuine ADDITIONS (sql.queryEntityRowsFresh in bolt-sdk; draft delete-on-publish) get the
+fuller coder-shape + git-intent + red-first + implement treatment.
+
+CONTRACT DISCIPLINE (held): tests FIRST, red-first LITERAL (assert correct behavior vs the
+REAL path; broken -> red = the spec; NEVER reshape to green via a side channel bypassing the
+real path). The S3 oracle VERIFIES the production path, never REPLACES it ("if the production
+path is broken, does this go red?" = must be yes). Round-trip COUNT is part of the contract
+(gosdk tier proves N keystrokes -> few S3 PUTs). record.contract(...) pins rationale (decision
++ git authority + coder cmd) = the convergence point for codex+me working in tandem.
+
+RESEARCH-BEFORE-WRITE (held): coder reads 3 authorities before ANY payload -- SDL
+(go_gql_op/gql_type = wire), formation schema (raindb-base pack config.json+schema.json =
+payload), Go SDK (go_function pkg/sdk = semantics); git for intent. Never guess a field.
+
+TANDEM SPLIT (same machine/repo -- ONE task at a time to codex, I peer-review, then next):
+- ME (lead): sql.queryEntityRowsFresh in bolt-sdk (I designed it) + its freshness live
+  contract (row-list merge vs raw-S3 newest, fail-loud) + the freshness lib/ verify helper.
+- CODEX (read-only research first): read shapes (coder, 3 authorities) for (a) the redis+
+  counter token -- mutateAndRead JSONOpWindowIncrement + delta/total fold (pkg/sdk token.go,
+  the tenant-meter formation, the SDL mutate op) and (b) the draft writeDelay+autoCache
+  coalescing (TokenLifecycle formation.go:77, ObjectCache.Mutate). Report: what lib/ ALREADY
+  has (grep lib/ for token/counter/mutate helpers + provision builders) vs what a reusable
+  helper must add, and the round-trip-count gosdk approach for the coalescing proof. READ-ONLY,
+  reporting findings, NOT editing.
+Then I peer-review codex's research, give it the next (implementation) task, and iterate --
+2x throughput, contracts as the sync point.
