@@ -1,4 +1,4 @@
-// api.ts -- the FitLedger client's entire API surface. Plain fetch against the
+// api.ts -- the Fit client's entire API surface. Plain fetch against the
 // bolt. Same origin in dev (Vite proxies /api/*) and prod (the bolt serves the
 // SPA next to these routes) -- no CORS, no env switching. The session cookie is
 // HttpOnly and rides automatically; we also keep the Bearer token for clarity.

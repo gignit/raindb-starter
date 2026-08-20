@@ -1,4 +1,4 @@
-// App.tsx -- FitLedger: a mobile-first workout + journal SaaS on RainDB.
+// App.tsx -- Fit: a mobile-first workout + journal SaaS on RainDB.
 //
 // Structure: an auth gate wraps a tabbed shell (Workout / Journal / Progress).
 // Every screen is a thin view over src/api.ts. The app code is about the USE
@@ -21,13 +21,13 @@ export default function App() {
     api.me().then((u) => { setUser(u); setLoading(false); });
   }, []);
 
-  if (loading) return <div className="center muted">Loading FitLedger...</div>;
+  if (loading) return <div className="center muted">Loading Fit...</div>;
   if (!user) return <AuthGate onAuthed={setUser} />;
 
   return (
     <div className="app">
       <header className="topbar">
-        <div className="brand">FitLedger</div>
+        <div className="brand">Fit</div>
         <button className="link" onClick={() => api.logout().then(() => setUser(null))}>Sign out</button>
       </header>
       <Odometer />
@@ -66,7 +66,7 @@ function AuthGate({ onAuthed }: { onAuthed: (u: api.User) => void }) {
 
   return (
     <div className="authpage">
-      <div className="brand big">FitLedger</div>
+      <div className="brand big">Fit</div>
       <p className="muted">Track workouts + a private journal. Powered by RainDB.</p>
       <form className="card" onSubmit={submit}>
         <h2>{mode === "login" ? "Sign in" : "Create account"}</h2>

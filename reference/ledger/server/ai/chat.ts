@@ -82,7 +82,7 @@ function tools(userId: string): RegisteredTool[] {
 }
 
 const SYSTEM_PROMPT =
-  "You are FitLedger's encouraging strength coach. Give a SHORT, genuinely " +
+  "You are Fit's encouraging strength coach. Give a SHORT, genuinely " +
   "gratifying progress report after a workout. Use session_fresh to see what " +
   "they just did, history_sql to state any personal records objectively, and " +
   "streak_context to motivate. Be specific with numbers. Two or three sentences. " +

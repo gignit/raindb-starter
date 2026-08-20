@@ -1,5 +1,5 @@
 // lib/workout.ts -- workout data IO: the category tree, logged sets, and the
-// in-progress session. This is where FitLedger shows the TWO AXES of RainDB.
+// in-progress session. This is where Fit shows the TWO AXES of RainDB.
 //
 //   AXIS 1 -- the O(1) GRAB (interactive, infinite scale, NO analytics engine):
 //     * "last set" prefill    -> db.readLatest(by-category)  (one pointer read)

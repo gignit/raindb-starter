@@ -1,4 +1,4 @@
-# FitLedger -- Features, Requirements & RainDB Primitive Map
+# Fit -- Features, Requirements & RainDB Primitive Map
 
 The raindb-starter reference bolt. A launchable, white-labelable workout + journal
 SaaS: clone it, run setup, deploy for yourself / family / a gym's members. Every
@@ -119,7 +119,7 @@ The app must be about the USE CASE, not RainDB constructs. Anything reusable han
 while building the app is a signal it belongs in `@raindb/bolt-sdk` / `@raindb/agent`:
 
 - **`createSessionAuth(config)` [bolt-sdk, TO ADD]** -- app-level email/password accounts with
-  REVOCABLE sessions. raindb-app AND FitLedger both hand-roll this identical machinery
+  REVOCABLE sessions. raindb-app AND Fit both hand-roll this identical machinery
   (register/login/logout/requireUser: hashPassword -> user droplet; JWT-carries-sessionId +
   a session TOKEN with autoExtend for a sliding, revocable window; extractToken from
   Bearter-or-cookie; requireUser verifies JWT + reads/extends the session). The existing SDK
@@ -127,7 +127,7 @@ while building the app is a signal it belongs in `@raindb/bolt-sdk` / `@raindb/a
   capability. Design: a factory configured with { usersFormation, sessionFormation,
   jwtSecretName, cookieName, ttlSec } returning the typed register/login/logout/requireUser
   fns. Modeled on the proven raindb-app bolt/server/auth.ts pattern (platform_user +
-  platform_session, recycle 30d + autoExtend). FitLedger's lib/auth.ts is the first consumer
+  platform_session, recycle 30d + autoExtend). Fit's lib/auth.ts is the first consumer
   and refactors to just configure it once the SDK primitive lands + is unit-tested.
 - **`iam.mintActivitySubscription` [bolt-sdk, DONE]** -- already added (real-time alerts grant).
 - Continue adding as the build surfaces gaps (the SDK becomes eventually-perfect).

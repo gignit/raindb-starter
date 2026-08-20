@@ -1,4 +1,4 @@
-// server/index.ts -- the FitLedger bolt entrypoint. onHttpRequest is the single
+// server/index.ts -- the Fit bolt entrypoint. onHttpRequest is the single
 // handler the RainDB Lightning runtime invokes for every request. There is NO
 // separate API server, NO database process, NO ORM, NO migrations: the runtime
 // hands us (ctx, req), we dispatch to a handler, and handlers read/write RainDB
@@ -35,12 +35,12 @@ export async function onHttpRequest(ctx: BoltContext, req: BoltRequest): Promise
   // REQUIRED first line: wire the ambient ctx so db.*/log.*/ids.* resolve.
   setCtx(ctx);
   const { method, path } = req;
-  ctx.log.info("fitledger.request", { method, path });
+  ctx.log.info("fit.request", { method, path });
 
   try {
     // ---- health (deployment healthcheck) ----
     if (path === "/api/health" && method === "GET") {
-      return { status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "ok", app: "fitledger" }) };
+      return { status: 200, headers: { "content-type": "application/json" }, body: JSON.stringify({ status: "ok", app: "fit" }) };
     }
 
     // ---- streaming AI (SSE) first ----
@@ -100,7 +100,7 @@ export async function onHttpRequest(ctx: BoltContext, req: BoltRequest): Promise
 
     return notFound(`no route for ${method} ${path}`);
   } catch (e) {
-    ctx.log.error("fitledger.error", { path, err: e instanceof Error ? e.message : String(e) });
+    ctx.log.error("fit.error", { path, err: e instanceof Error ? e.message : String(e) });
     return bad(e instanceof Error ? e.message : "internal error", 500);
   }
 }

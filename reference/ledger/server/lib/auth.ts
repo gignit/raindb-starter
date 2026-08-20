@@ -1,4 +1,4 @@
-// lib/auth.ts -- FitLedger authentication (IAM Layer 1: the bolt owns its users).
+// lib/auth.ts -- Fit authentication (IAM Layer 1: the bolt owns its users).
 //
 // This is the APP's end-user accounts (a gym member signing in) -- DISTINCT from
 // the TENANT key that runs the bolt itself. The pattern is modeled on the proven

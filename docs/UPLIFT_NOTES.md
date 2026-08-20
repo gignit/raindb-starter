@@ -1017,7 +1017,7 @@ described as "RainDB tokens give you instant atomic counters + live stats, no ex
 infrastructure." One AGENTS "when you need X" row can point at the counter/token pattern.
 The full redis-replacement story belongs to a sibling example (raindb-redis), not the starter.
 
-## FULL FEATURE SET -- FitLedger, a launchable white-label SaaS (operator: build it all)
+## FULL FEATURE SET -- Fit, a launchable white-label SaaS (operator: build it all)
 
 The starter becomes a DEPLOYABLE PRODUCT (auth-gated) an agent can launch for self / family /
 white-label for a gym. Ledger morphs -> JOURNAL. Workout tracker + journal share one auth'd,
@@ -1386,23 +1386,23 @@ stage/commit/branch it. This is non-negotiable to keep the shared worktree sane.
 ONE-BRANCH-PER-REPO (never switch off these):
 - raindb-prime:      test/live-counter-token-contract  (draft+counter contracts + versionHistory fix e37e6ada, all merged)
 - raindb-bolt-sdk-ts: feat/files-graphql-fallback       (all SDK primitives + versionHistory + writeToken envelope fix)
-- raindb-starter:     uplift/2026-08                     (FitLedger app)
+- raindb-starter:     uplift/2026-08                     (Fit app)
 All clean. codex's versionHistory host fix is DONE + deployed to prod (e37e6ada); probe
 bolts need a republish (pre-fix SDK embedded) to show versionHistory green -- redeploy only.
 
-## M6a DEPLOYED -- FitLedger is LIVE on vector-sandbox1
+## M6a DEPLOYED -- Fit is LIVE on vector-sandbox1
 URL: https://stormfront-7c0095a8e994.raindb.io  (boltId 01a01e5a-f7ff-75b0-bbf8-7c0095a8e994, active)
-/api/health -> {"status":"ok","app":"fitledger"}. Server+client both live.
+/api/health -> {"status":"ok","app":"fit"}. Server+client both live.
 ROOT CAUSE of the deploy 500: the server-side publish gate REQUIRES the capabilities' expected
 secrets to be staged; deploying WITHOUT --from-secrets 500s (a platform bug -- should be 400 with a
 clear "missing secrets" message; codex confirming). FIX: `--from-secrets <json>` stages the 5 secrets
 (FL_SESSION_SECRET random + RAINDB_GRAPHQL_ENDPOINT/KEY + LLM_API_BASE/KEY) AND satisfies the gate.
 Correct deploy command (for setup.sh):
-  raindb-cli --profile <p> lightning bolt deploy --name fitledger-ref --engine goja \
+  raindb-cli --profile <p> lightning bolt deploy --name fit-ref --engine goja \
     --source reference/ledger/server --entry index.ts \
     --capabilities <abs>/config/capabilities.json --routes <abs>/config/routes.json \
     --deployment <abs>/config/deployment.json --client-dist ../../../client/dist \
-    --from-secrets <abs>/.fitledger-secrets.json
+    --from-secrets <abs>/.fit-secrets.json
 KEY DEPLOY FACTS (for M5 setup.sh + deploy.sh fix):
 - The platform RE-BUILDS from --source via its own esbuild; --entry is RELATIVE to --source (index.ts,
   NOT the prebuilt dist/main.cjs). --client-dist is joined onto --source so must be relative
@@ -1410,7 +1410,7 @@ KEY DEPLOY FACTS (for M5 setup.sh + deploy.sh fix):
 - Removed the old server/ dir (broken prisma imports the platform esbuild tripped on -- superseded by
   reference/ledger/server/). deploy.sh still references formations/*-config.json + server/index.ts --
   needs updating in M5 to the reference/ paths + --from-secrets on first deploy.
-- .fitledger-secrets.json is gitignored (real values). Secrets now staged; drop --from-secrets on
+- .fit-secrets.json is gitignored (real values). Secrets now staged; drop --from-secrets on
   redeploys unless values change.
 
 ## M6b CHROME-DEVTOOLS E2E -- CORE VALIDATED LIVE (vector-sandbox1)

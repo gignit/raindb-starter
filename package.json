@@ -1,9 +1,9 @@
 {
-  "name": "fitledger-starter",
+  "name": "fit-starter",
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "FitLedger -- the RainDB starter: a deployable, white-labelable workout + journal SaaS. A TypeScript Lightning bolt server (@raindb/bolt-sdk + @raindb/agent) + Vite/React client. Clone it, run scripts/setup.sh, and you have a live app on RainDB. No database, no ORM, no Redis, no message broker -- the substrate is the backend.",
+  "description": "Fit -- the RainDB starter: a deployable, white-labelable workout + journal SaaS. A TypeScript Lightning bolt server (@raindb/bolt-sdk + @raindb/agent) + Vite/React client. Clone it, run scripts/setup.sh, and you have a live app on RainDB. No database, no ORM, no Redis, no message broker -- the substrate is the backend.",
   "dependencies": {
     "@raindb/bolt-sdk": "file:../raindb-bolt-sdk-ts",
     "@raindb/agent": "file:../raindb-agent-ts"
