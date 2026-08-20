@@ -21,6 +21,7 @@
 // readLatest, token.delete.
 
 import { crypto, jwt, cookies, db, token, ids, type BoltRequest } from "@raindb/bolt-sdk";
+import { payload } from "./http.js";
 
 const USERS = "ref-users";
 const SESSIONS = "ref-session";
@@ -111,12 +112,12 @@ export async function register(input: { email: string; password: string; name: s
     userId: ids.uuidv7(),
     email,
     passwordHash: await crypto.hashPassword(input.password, 12),
-    name: input.name?.trim() || email.split("@")[0],
+    name: input.name?.trim() || email.split("@")[0] || email,
     active: true,
     role: "member",
     createdAt: new Date().toISOString(),
   };
-  await db.writeDroplet({ formationId: USERS, payload: user });
+  await db.writeDroplet({ formationId: USERS, payload: payload(user) });
   return issue(user, input.userAgent);
 }
 
@@ -125,7 +126,7 @@ export async function login(input: { email: string; password: string; userAgent?
   const ok = user ? await crypto.verifyPassword(input.password, user.passwordHash) : false;
   if (!user || !ok || user.active === false) throw new AuthError("invalid email or password", 401);
   // Stamp lastLoginAt as a new revision (audit trail of logins, for free).
-  await db.writeDroplet({ formationId: USERS, payload: { ...user, lastLoginAt: new Date().toISOString() } });
+  await db.writeDroplet({ formationId: USERS, payload: payload({ ...user, lastLoginAt: new Date().toISOString() }) });
   return issue(user, input.userAgent);
 }
 

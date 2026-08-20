@@ -48,6 +48,7 @@
 //   raindb-cli sql -c 'SELECT status, COUNT(*) FROM entity."ref-entries" GROUP BY status'
 
 import { db, ids } from "@raindb/bolt-sdk";
+import { payload } from "./http.js";
 
 export const FORMATION = "ref-entries";
 const IDX_BY_ID = "by-id";
@@ -119,7 +120,7 @@ export async function createEntry(input: {
     updatedAt: null,
     revisionNote: null,
   };
-  await db.writeDroplet({ formationId: FORMATION, payload: entry });
+  await db.writeDroplet({ formationId: FORMATION, payload: payload(entry) });
   return entry;
 }
 
@@ -143,7 +144,7 @@ export async function editEntry(
     updatedAt: new Date().toISOString(),
     revisionNote: revisionNote ?? null,
   };
-  await db.writeDroplet({ formationId: FORMATION, payload: next });
+  await db.writeDroplet({ formationId: FORMATION, payload: payload(next) });
   return next;
 }
 
@@ -162,7 +163,7 @@ export async function restoreRevision(
     updatedAt: new Date().toISOString(),
     revisionNote: `restored from revision ${dropletId}`,
   };
-  await db.writeDroplet({ formationId: FORMATION, payload: restored });
+  await db.writeDroplet({ formationId: FORMATION, payload: payload(restored) });
   return restored;
 }
 

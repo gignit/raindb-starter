@@ -15,6 +15,7 @@
 // even mid-edit.
 
 import { db, token, ids } from "@raindb/bolt-sdk";
+import { payload } from "./http.js";
 
 const DRAFTS = "ref-journal-draft";
 
@@ -39,7 +40,7 @@ export function newDraftId(): string {
  * call every few seconds.
  */
 export async function autosave(draft: Draft): Promise<void> {
-  await db.writeToken({ formationId: DRAFTS, payload: draft });
+  await db.writeToken({ formationId: DRAFTS, payload: payload(draft) });
 }
 
 /** Resume a draft (e.g. the user reopens the editor). null when none/expired. */

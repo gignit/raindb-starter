@@ -16,6 +16,7 @@
 // workout ends). Durable fact = droplet; ephemeral state = token.
 
 import { db, ids } from "@raindb/bolt-sdk";
+import { payload } from "./http.js";
 
 const CATEGORIES = "ref-workout-categories";
 const SETS = "ref-workout-sets";
@@ -84,7 +85,7 @@ export async function createCategory(input: {
     sortOrder: input.sortOrder ?? 0,
     metricSchema: input.metricSchema,
   };
-  await db.writeDroplet({ formationId: CATEGORIES, payload: category });
+  await db.writeDroplet({ formationId: CATEGORIES, payload: payload(category) });
   return category;
 }
 
@@ -120,7 +121,7 @@ export async function editCategory(
   const current = await readCategory(categoryId);
   if (!current) return null;
   const next: Category = { ...current, ...changes, categoryId: current.categoryId, userId: current.userId };
-  await db.writeDroplet({ formationId: CATEGORIES, payload: next });
+  await db.writeDroplet({ formationId: CATEGORIES, payload: payload(next) });
   return next;
 }
 
@@ -137,7 +138,7 @@ export async function logSet(input: Omit<WorkoutSet, "setId" | "recordedAt"> & {
     isBenchmark: input.isBenchmark ?? false,
     recordedAt: input.recordedAt ?? new Date().toISOString(),
   };
-  await db.writeDroplet({ formationId: SETS, payload: set });
+  await db.writeDroplet({ formationId: SETS, payload: payload(set) });
   return set;
 }
 
@@ -183,7 +184,7 @@ export async function startSession(userId: string): Promise<WorkoutSession> {
     startedAt: new Date().toISOString(),
     completedCategoryIds: [],
   };
-  await db.writeToken({ formationId: SESSION, payload: session });
+  await db.writeToken({ formationId: SESSION, payload: payload(session) });
   return session;
 }
 
