@@ -112,3 +112,22 @@ replace, and the two-plane freshness merge behavior.
 - **Phase 2:** formations (all `ff-*`) + walking skeleton on vector-sandbox1.
 - **Phase 3+:** build features top-to-bottom against proven primitives; deploy;
   chrome-devtools e2e; peer review.
+
+## SDK primitives surfaced DURING the build (fill back into the SDK -- the objective)
+
+The app must be about the USE CASE, not RainDB constructs. Anything reusable hand-rolled
+while building the app is a signal it belongs in `@raindb/bolt-sdk` / `@raindb/agent`:
+
+- **`createSessionAuth(config)` [bolt-sdk, TO ADD]** -- app-level email/password accounts with
+  REVOCABLE sessions. raindb-app AND FitLedger both hand-roll this identical machinery
+  (register/login/logout/requireUser: hashPassword -> user droplet; JWT-carries-sessionId +
+  a session TOKEN with autoExtend for a sliding, revocable window; extractToken from
+  Bearter-or-cookie; requireUser verifies JWT + reads/extends the session). The existing SDK
+  `auth` binding is the TENANT-grant context (infra plane), NOT app users -- so this is a NEW
+  capability. Design: a factory configured with { usersFormation, sessionFormation,
+  jwtSecretName, cookieName, ttlSec } returning the typed register/login/logout/requireUser
+  fns. Modeled on the proven raindb-app bolt/server/auth.ts pattern (platform_user +
+  platform_session, recycle 30d + autoExtend). FitLedger's lib/auth.ts is the first consumer
+  and refactors to just configure it once the SDK primitive lands + is unit-tested.
+- **`iam.mintActivitySubscription` [bolt-sdk, DONE]** -- already added (real-time alerts grant).
+- Continue adding as the build surfaces gaps (the SDK becomes eventually-perfect).

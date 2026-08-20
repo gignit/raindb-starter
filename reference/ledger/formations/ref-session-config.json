@@ -1,0 +1,33 @@
+{
+  "configVersion": 1,
+  "minSchemaVersion": 1,
+  "maxSchemaVersion": 1,
+  "compatibleSchemas": [
+    "v1"
+  ],
+  "formationId": "ref-session",
+  "formationType": "token",
+  "scopeKey": "sessionId",
+  "autoGenId": true,
+  "pathTemplate": "tokens/ref-session/{{.sessionId}}.json",
+  "lifecycle": {
+    "expirationMode": "recycle",
+    "expirationDuration": "30d",
+    "autoExtend": true,
+    "cacheTTL": "1h"
+  },
+  "indexes": [
+    {
+      "name": "by-id",
+      "template": "indexes/ref-session/by-id/{{.sessionId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    },
+    {
+      "name": "by-userid",
+      "template": "indexes/ref-session/by-userid/{{.userId}}/{{.sessionId}}/latest.json",
+      "type": "pointer",
+      "strategy": "write"
+    }
+  ]
+}

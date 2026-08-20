@@ -1,0 +1,32 @@
+{
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "sessionId",
+    "userId",
+    "email"
+  ],
+  "properties": {
+    "sessionId": {
+      "type": "string"
+    },
+    "userId": {
+      "type": "string"
+    },
+    "email": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "userAgent": {
+      "type": "string"
+    },
+    "ip": {
+      "type": "string"
+    }
+  }
+}

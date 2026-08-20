@@ -2,14 +2,15 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["userId", "email", "passwordHash", "displayName", "createdAt"],
+  "required": ["userId", "email", "passwordHash", "name", "active"],
   "properties": {
     "userId": { "type": "string", "format": "uuid" },
     "email": { "type": "string", "format": "email" },
     "passwordHash": { "type": "string", "minLength": 1 },
-    "displayName": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "active": { "type": "boolean" },
     "role": { "type": "string" },
     "createdAt": { "type": "string", "format": "date-time" },
-    "updatedAt": { "type": "string", "format": "date-time" }
+    "lastLoginAt": { "type": "string", "format": "date-time" }
   }
 }

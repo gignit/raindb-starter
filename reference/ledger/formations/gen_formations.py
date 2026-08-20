@@ -92,6 +92,22 @@ def std_cfg(fid, scope_key, indexes, extra=None):
 
 FORMATIONS = {}
 
+# ref-session: revocable session token (modeled on raindb-app platform_session).
+# JWT carries the sessionId; requireUser verifies the JWT AND reads this token
+# (autoExtend on read = silent session extension), so logout DELETES the token
+# and the session is instantly revoked -- a JWT-only cookie could never revoke.
+FORMATIONS["ref-session"] = (
+    {**HEADER, "formationId": "ref-session", "formationType": "token", "scopeKey": "sessionId",
+     "autoGenId": True, "pathTemplate": "tokens/ref-session/{{.sessionId}}.json",
+     "lifecycle": {"expirationMode": "recycle", "expirationDuration": "30d", "autoExtend": True, "cacheTTL": "1h"},
+     "indexes": [
+         ptr("by-id", "indexes/ref-session/by-id/{{.sessionId}}/latest.json"),
+         ptr("by-userid", "indexes/ref-session/by-userid/{{.userId}}/{{.sessionId}}/latest.json")]},
+    {"type": "object", "additionalProperties": True, "required": ["sessionId", "userId", "email"], "properties": {
+        "sessionId": {"type": "string"}, "userId": {"type": "string"}, "email": {"type": "string"},
+        "name": {"type": "string"}, "role": {"type": "string"}, "userAgent": {"type": "string"}, "ip": {"type": "string"}}},
+)
+
 # ref-config: white-label brand token.
 FORMATIONS["ref-config"] = (
     token_cfg("ref-config", "configId", {"expirationMode": "none", "autoCache": True, "cacheTTL": "1h"}),

@@ -1,43 +1,51 @@
 // lib/auth.ts -- FitLedger authentication (IAM Layer 1: the bolt owns its users).
 //
-// THE PATTERN TO COPY: a bolt is multi-tenant-SAFE only if every read/write is
-// anchored on the AUTHENTICATED userId, never a userId from the request body.
-// Register hashes the password; login verifies it and mints a signed session
-// JWT into an HttpOnly cookie; every subsequent request re-derives the userId
-// from that cookie. A route that trusts req.body.userId is the #1 SaaS-on-RainDB
-// security bug -- so the ONLY way a route learns who is calling is requireUser().
+// This is the APP's end-user accounts (a gym member signing in) -- DISTINCT from
+// the TENANT key that runs the bolt itself. The pattern is modeled on the proven
+// raindb-app bolt auth (bolt/server/auth.ts): a signed JWT that carries a
+// sessionId, PLUS a revocable session TOKEN in RainDB.
 //
-// All four primitives are LIVE @raindb/bolt-sdk bindings (no external auth
-// service, no session store -- the session IS the signed cookie, and the user
-// record IS a droplet):
-//   crypto.hashPassword / crypto.verifyPassword  -- bcrypt, salted
-//   jwt.sign / jwt.verify                          -- HS256 over a NAMED bolt
-//     secret (the name is declared in capabilities.raindb.secrets.names; the
-//     substrate resolves it -- the bolt never handles the secret bytes)
-//   cookies.build / cookies.parse                  -- HttpOnly, SameSite=Strict
+// Why both a JWT and a session token? A bare JWT cannot be revoked before it
+// expires. By also writing a ref-session token (recycle 30d, autoExtend) and
+// putting its sessionId in the JWT, every request re-reads the session token:
+//   * the read silently EXTENDS the session (autoExtend) -- a sliding window;
+//   * logout DELETES the session token, so the JWT is instantly dead;
+//   * revokeAllSessions can sign the user out everywhere.
+// A route learns the caller ONLY from requireUser() -- never req.body.userId
+// (trusting the body is the #1 SaaS-on-RainDB security bug).
+//
+// Primitives (all coder-verified LIVE @raindb/bolt-sdk bindings; no external auth
+// service): crypto.hashPassword/verifyPassword (bcrypt),
+// jwt.sign(secretName,claims,expiresInSec)/verify(secretName,token) over a NAMED
+// secret the substrate resolves, cookies.parse, db.writeDroplet/writeToken/
+// readLatest, token.delete.
 
-import { crypto, jwt, cookies, db, ids, type BoltRequest } from "@raindb/bolt-sdk";
+import { crypto, jwt, cookies, db, token, ids, type BoltRequest } from "@raindb/bolt-sdk";
 
 const USERS = "ref-users";
-const SESSION_COOKIE = "fl_session";
-const SESSION_TTL_SEC = 60 * 60 * 24 * 30; // 30 days
+const SESSIONS = "ref-session";
+const SESSION_COOKIE = "fl_token";
+const TOKEN_EXPIRY_SEC = 60 * 60 * 24 * 30; // 30 days
 const JWT_SECRET_NAME = "FL_SESSION_SECRET";
 
 export interface User {
   userId: string;
   email: string;
   passwordHash: string;
-  displayName: string;
+  name: string;
+  active: boolean;
   role?: string;
-  createdAt: string;
-  updatedAt?: string;
+  createdAt?: string;
+  lastLoginAt?: string;
 }
 
-/** The authenticated caller, derived from the session cookie -- never the body. */
+/** The authenticated caller, derived from the verified JWT + live session. */
 export interface Session {
   userId: string;
   email: string;
-  displayName: string;
+  name: string;
+  role: string;
+  sessionId: string;
 }
 
 export class AuthError extends Error {
@@ -50,106 +58,142 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** Read a user by email (login lookup) -- O(1) via the by-email pointer index. */
 async function readUserByEmail(email: string): Promise<User | null> {
   const d = await db.readLatest({ formationId: USERS, indexId: "by-email", scopeValue: normalizeEmail(email) });
   return (d?.payload as User | undefined) ?? null;
 }
 
-/** Read a user by id (session read) -- O(1) via by-id. */
 export async function readUserById(userId: string): Promise<User | null> {
   const d = await db.readLatest({ formationId: USERS, indexId: "by-id", scopeValue: userId });
   return (d?.payload as User | undefined) ?? null;
 }
 
-/**
- * Register a new account. Hashes the password (never stored plaintext), mints a
- * UUIDv7 userId, writes the user droplet. Rejects a duplicate email. Returns the
- * created session so the caller can set the cookie (auto-login on register).
- */
-export async function register(input: {
-  email: string;
-  password: string;
-  displayName: string;
-}): Promise<{ session: Session; setCookie: string }> {
+// ------------------------------------------------------------- token + session
+
+function generateToken(user: Pick<User, "userId" | "email" | "name" | "role">, sessionId: string): Promise<string> {
+  return jwt.sign(
+    JWT_SECRET_NAME,
+    { userId: user.userId, email: user.email, name: user.name, role: user.role ?? "member", sessionId },
+    TOKEN_EXPIRY_SEC,
+  );
+}
+
+/** Write a revocable session token; the formation autoGens the sessionId. */
+async function createSession(user: User, meta: { userAgent?: string } = {}): Promise<string> {
+  const env = await db.writeToken({
+    formationId: SESSIONS,
+    payload: {
+      userId: user.userId, email: user.email, name: user.name, role: user.role ?? "member",
+      userAgent: meta.userAgent ?? "", createdAt: new Date().toISOString(),
+    },
+  });
+  // The ref-session formation autoGens the sessionId; the write envelope returns
+  // it as scopeValue (db.writeToken now surfaces the full envelope). That
+  // sessionId is what the JWT carries + what logout deletes.
+  return env.scopeValue ?? env.dropletId;
+}
+
+// --------------------------------------------------------------- register/login
+
+export interface AuthOutcome {
+  token: string;
+  setCookie: string;
+  user: { userId: string; email: string; name: string; role: string };
+}
+
+export async function register(input: { email: string; password: string; name: string; userAgent?: string }): Promise<AuthOutcome> {
   const email = normalizeEmail(input.email);
   if (!email || !input.password || input.password.length < 8) {
     throw new AuthError("email and a password of at least 8 characters are required", 400);
   }
-  if (await readUserByEmail(email)) {
-    throw new AuthError("an account with that email already exists", 409);
-  }
+  if (await readUserByEmail(email)) throw new AuthError("an account with that email already exists", 409);
   const user: User = {
     userId: ids.uuidv7(),
     email,
-    passwordHash: await crypto.hashPassword(input.password),
-    displayName: input.displayName?.trim() || email.split("@")[0],
+    passwordHash: await crypto.hashPassword(input.password, 12),
+    name: input.name?.trim() || email.split("@")[0],
+    active: true,
     role: "member",
     createdAt: new Date().toISOString(),
   };
   await db.writeDroplet({ formationId: USERS, payload: user });
-  return issueSession(user);
+  return issue(user, input.userAgent);
 }
 
-/** Verify credentials and issue a session. Constant-ish failure (no user-enumeration hint). */
-export async function login(input: {
-  email: string;
-  password: string;
-}): Promise<{ session: Session; setCookie: string }> {
+export async function login(input: { email: string; password: string; userAgent?: string }): Promise<AuthOutcome> {
   const user = await readUserByEmail(input.email);
   const ok = user ? await crypto.verifyPassword(input.password, user.passwordHash) : false;
-  if (!user || !ok) {
-    throw new AuthError("invalid email or password", 401);
-  }
-  return issueSession(user);
+  if (!user || !ok || user.active === false) throw new AuthError("invalid email or password", 401);
+  // Stamp lastLoginAt as a new revision (audit trail of logins, for free).
+  await db.writeDroplet({ formationId: USERS, payload: { ...user, lastLoginAt: new Date().toISOString() } });
+  return issue(user, input.userAgent);
 }
 
-async function issueSession(user: User): Promise<{ session: Session; setCookie: string }> {
-  const session: Session = { userId: user.userId, email: user.email, displayName: user.displayName };
-  // jwt.sign(secretName, claims, expiresInSec) -- the substrate resolves the
-  // named secret; standard claims (iat/iss) are filled in when absent.
-  const token = await jwt.sign(
-    JWT_SECRET_NAME,
-    { sub: user.userId, email: user.email, name: user.displayName },
-    SESSION_TTL_SEC,
-  );
-  const setCookie = await cookies.build(SESSION_COOKIE, token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "Strict",
-    path: "/",
-    maxAge: SESSION_TTL_SEC,
+async function issue(user: User, userAgent?: string): Promise<AuthOutcome> {
+  const sessionId = await createSession(user, { userAgent });
+  const tok = await generateToken(user, sessionId);
+  const setCookie = await cookies.build(SESSION_COOKIE, tok, {
+    httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: TOKEN_EXPIRY_SEC,
   });
-  return { session, setCookie };
+  return { token: tok, setCookie, user: { userId: user.userId, email: user.email, name: user.name, role: user.role ?? "member" } };
 }
 
-/** Clear the session cookie (logout). */
-export async function clearSession(): Promise<string> {
+/** Logout: delete the session token (instant revoke) + clear the cookie. */
+export async function logout(session: Session): Promise<string> {
+  try {
+    await token.delete(SESSIONS, session.sessionId);
+  } catch {
+    // best-effort: an already-expired session is fine
+  }
   return cookies.build(SESSION_COOKIE, "", { httpOnly: true, secure: true, sameSite: "Strict", path: "/", maxAge: 0 });
 }
 
+// -------------------------------------------------------------- the anchor
+
+/** Pull the JWT off the Authorization: Bearer header, or the session cookie. */
+async function extractToken(req: BoltRequest): Promise<string | null> {
+  const authHeader = req.headers?.["authorization"] ?? req.headers?.["Authorization"];
+  if (authHeader) {
+    const h = String(authHeader);
+    return h.startsWith("Bearer ") ? h.slice(7) : h;
+  }
+  const cookieHeader = req.headers?.["cookie"] ?? req.headers?.["Cookie"] ?? "";
+  const jar = await cookies.parse(String(cookieHeader));
+  return jar[SESSION_COOKIE] ?? null;
+}
+
 /**
- * THE authorization anchor. Derive the caller from the signed session cookie.
- * Every protected route calls this FIRST and uses the returned userId -- never a
- * userId from the request body or query. Throws AuthError(401) when unauthenticated.
+ * THE authorization anchor. Every protected route calls this FIRST. Verifies the
+ * JWT, then reads the ref-session token to confirm it hasn't been revoked (the
+ * read also autoExtends the session). Throws AuthError(401) otherwise. The
+ * returned userId is the ONLY user identity a route may trust.
  */
 export async function requireUser(req: BoltRequest): Promise<Session> {
-  const header = req.headers?.["cookie"] ?? req.headers?.["Cookie"] ?? "";
-  const jar = await cookies.parse(String(header));
-  const token = jar[SESSION_COOKIE];
-  if (!token) throw new AuthError("not signed in", 401);
+  const tok = await extractToken(req);
+  if (!tok) throw new AuthError("not signed in", 401);
+
   let claims: Record<string, unknown>;
   try {
-    // jwt.verify(secretName, token) -- validates signature + exp/nbf.
-    claims = await jwt.verify(JWT_SECRET_NAME, token);
+    claims = await jwt.verify(JWT_SECRET_NAME, tok);
   } catch {
     throw new AuthError("session expired or invalid", 401);
   }
-  const userId = String(claims.sub ?? "");
-  if (!userId) throw new AuthError("malformed session", 401);
+  const userId = String(claims.userId ?? "");
+  const sessionId = String(claims.sessionId ?? "");
+  if (!userId || !sessionId) throw new AuthError("malformed session", 401);
+
+  // Revocation check + silent autoExtend: a deleted session token = logged out.
+  const live = await db.readLatest({ formationId: SESSIONS, indexId: "by-id", scopeValue: sessionId });
+  if (!live) throw new AuthError("session expired or revoked", 401);
+  const p = (live.payload as Record<string, unknown> | undefined) ?? {};
+
+  // Live-merge role/name/email off the session so a role change takes effect
+  // on the next request (the JWT's copy may be stale).
   return {
     userId,
-    email: String(claims.email ?? ""),
-    displayName: String(claims.name ?? ""),
+    email: String(p.email ?? claims.email ?? ""),
+    name: String(p.name ?? claims.name ?? ""),
+    role: String(p.role ?? claims.role ?? "member"),
+    sessionId,
   };
 }
