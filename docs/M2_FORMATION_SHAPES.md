@@ -64,3 +64,20 @@ validation, token.go:192,311).
     schema addlProps:FALSE required[photoId,userId,imageContentType,imageFilename,capturedAt] -- do NOT require image
     (CDU delivers binary out of band). revisions:true injects imageVersionId + ver/{{.imageVersionId}}/ + by-id
     (revisions.go:151,201; augmentation before compile so strict schema OK, build.go:142).
+
+## PEER-REVIEW VERDICTS (lead-eng, coder-authoritative -- validated codex, not trusted)
+- descIndex entryTemplate leaf: MUST bind a UUIDv7 var from the allowlist
+  {.dropletId,.messageId,.eventId,.sessionId,.relayId} (index_chain_validation.go:333,351).
+  ALL codex descIndex templates use {{.dropletId}} -> PASS. (This is the exact rule that killed
+  the old starter -- confirmed safe.)
+- descIndex setsTemplate MUST contain literal {{.setId}} + end /meta.json; entryTemplate ends
+  /meta.json + non-static leaf; latestPointerTemplate ends /latest.json + != entryTemplate
+  (index_chain_validation.go:289,412,394). codex shapes comply -> PASS.
+- Conditional index "isBenchmark == true": VALID. EvaluateIndexCondition (index_condition.go:32)
+  grammar is <field> <op> <value>; conditionEqual (line 149-150) renders bool via
+  fmt.Sprintf("%v",v) so bool true matches string "true" -> PASS.
+- Token verdict (no SQL/desc on token formations): codex correct (WriteToken skips periscope+desc,
+  token.go:469/878). ff-tags path is canonical sharded TokenObjectPath (composite scopeKey gives
+  isolation) -- codex corrected this himself.
+VERDICT: codex's 11 ff-* shapes are validator-safe on the highest-risk rules. APPROVED to author
+in M2 (with the shared header + the SQL block only on ff-journal/ff-workout-sets[/categories]).
