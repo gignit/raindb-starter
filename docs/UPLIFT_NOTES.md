@@ -737,3 +737,45 @@ My positions going in, coder-grounded:
    earlier point): /api/health does a REAL graphql reserve round-trip (reserve+abandon) so
    it fails LOUD at setup, not at first upload. Verify this in the health route.
 Await peers; adjudicate; then BUILD.
+
+## CODEX BUILD REVIEW -- two coder-grounded plan changes (ADJUDICATED: accept both)
+
+1. queryFresh redesign (ACCEPT -- codex is right, obvious on reflection): the freshness
+   MERGE only works for ENTITY-ROW LISTS (project late payloads onto columns, prepend
+   newest, dedupe by scope key). You CANNOT merge raw late rows into an AGGREGATE /
+   GROUP BY / window / percentile / regression result -- adding a row doesn't re-aggregate.
+   crexp's runSQLFresh only patches row lists + the caller re-applies filter/order/page
+   (crexp:277-304, 1403-1421). SO:
+   - Build sql.queryEntityRowsFresh({sql, formationId, scopeKey}) -> merged ROW LIST only,
+     explicitly for SELECT-columns-of-entities queries (the feed/list case). Documents that
+     it is NOT for aggregates.
+   - For the AI report's analytics (PR/1RM-regression/percentiles): DO NOT try to freshen
+     the aggregate. Instead the two-plane composition stands: history_sql runs the aggregate
+     over pooled data (lag is FINE for a trend/PR chart -- one 5-min window doesn't change a
+     6-week regression), AND session_fresh reads TODAY's just-finished sets from the by-update
+     index (fresh) so the report always includes the workout just completed. This is MORE
+     correct than a fake "fresh aggregate."
+   - MUST fail loud on harvest error (crexp returns stale on harvest failure crexp:261-266 --
+     a method named *fresh* must NOT copy that). queryEntityRowsFresh throws on harvest failure.
+   - Alt shape considered: queryWithFreshTail returning {sqlResult, lateDroplets} (caller
+     merges). Decide at build: queryEntityRowsFresh (opinionated, row-list) is cleaner for the
+     starter's actual use (the feed). Ship that; document the tail-return as the escape hatch.
+
+2. DEPENDENCY CLOSURE = THE fresh-clone break (ACCEPT -- concrete, already broken): starter
+   package.json depends on the SDK's UNQUALIFIED github default branch, but my SDK commits
+   (files/versionHistory/startSSE/mintActivitySubscription/queryFresh) are on
+   origin/feat/files-graphql-fallback, NOT origin/main. A fresh clone won't resolve them.
+   FIX before writing app code: either (a) merge the bolt-sdk feat branch to main + publish/
+   tag, or (b) pin the starter's dep to the exact SDK SHA/branch. Then CLONE INTO AN EMPTY
+   DIR (no sibling repos) + verify the lockfile resolves the intended SDK + deploy a tiny
+   goja SMOKE bolt exercising the new helpers WITH the graphql secrets + egress host staged
+   (graphql.ts:26 hard-fails without them). This is the de-risk-FIRST step.
+
+REVISED SEQUENCE (adjudicated): (0) resolve SDK dep closure: merge bolt-sdk feat->main (or
+tag) + pin the starter dep. (1) WALKING SKELETON on vector-sandbox1: setup/config/secrets,
+minimal formations, deploy, /api/health real reserve round-trip, ONE idempotent workout set,
+ONE ledger revision, ONE versioned-file round trip -- prove clean-clone deploy on ~30 lines.
+(2) build sql.queryEntityRowsFresh (row-list, fail-loud). (3) expand: formations full ->
+persistence -> routes -> ai/chat.ts (two-plane) -> config -> client -> app skeleton -> scripts
+-> docs. (4) chrome-devtools e2e. Keep both pillars (entries=foundation, workouts=showcase,
+ONE shared persistence/feed/history/AI impl -- Ledger must not become a 2nd deep app).
