@@ -53,7 +53,7 @@ export interface Note {
 export async function readNote(noteId: string): Promise<Note | null> {
   const d = await db.readLatest({
     formationId: FORMATION_NOTES,
-    indexId: "by-id-latest",
+    indexId: "by-id",
     scopeValue: noteId,
   });
   return (d?.payload as Note | undefined) ?? null;
@@ -157,7 +157,7 @@ export async function listAllNoteIds(): Promise<string[]> {
   for (;;) {
     const page = await db.listKeys({
       formationId: FORMATION_NOTES,
-      indexId: "by-id-latest",
+      indexId: "by-id",
       opts: { first: 200, ...(cursor ? { after: cursor } : {}) },
     });
     for (const k of page.keys) {

@@ -1,7 +1,7 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "title": "starter-notes v1",
-  "description": "The starter's example entity: a note. Every write of the same noteId creates a NEW immutable droplet (a revision); the by-id-latest pointer index always resolves to the newest one. This is the canonical RainDB entity shape -- replace it with YOUR domain entity (a product, a post, a booking) when you build your app. There are no migrations: bump the schema version and publish.",
+  "description": "The starter's example entity: a note. Every write of the same noteId creates a NEW immutable droplet (a revision); the by-id pointer index always resolves to the newest one. This is the canonical RainDB entity shape -- replace it with YOUR domain entity (a product, a post, a booking) when you build your app. There are no migrations: bump the schema version and publish.",
   "type": "object",
   "required": ["noteId", "authorName", "title", "body", "createdAt"],
   "properties": {
