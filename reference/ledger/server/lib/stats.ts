@@ -18,6 +18,15 @@ import { db } from "@raindb/bolt-sdk";
 const STATS = "ref-stats";
 const STREAKS = "ref-streaks";
 
+// db.mutate/mutateAndRead require the counter token to already EXIST (they are a
+// read-modify-write on a cached token, not create-on-write). So before the first
+// mutate on a scope we ensure the token exists with zeroed counters. Idempotent:
+// writeToken merges, so re-seeding an existing token is harmless.
+async function ensureCounter(formationId: string, scopeValue: string, seed: Record<string, unknown>): Promise<void> {
+  const existing = await db.readLatest({ formationId, indexId: "by-id", scopeValue });
+  if (!existing) await db.writeToken({ formationId, payload: seed });
+}
+
 // One global stats token drives the whole deployment's community odometer.
 const GLOBAL_STATS = "global";
 
@@ -37,7 +46,10 @@ export async function recordActivity(kind: "workout" | "set" | "journalEntry", v
     if (volumeKg > 0) ops.push({ kind: "increment", path: "counters.delta.volumeKg", by: volumeKg });
   }
   if (kind === "journalEntry") ops.push({ kind: "increment", path: "counters.delta.journalEntries", by: 1 });
-  if (ops.length) await db.mutate({ formationId: STATS, scopeValue: GLOBAL_STATS, ops });
+  if (ops.length) {
+    await ensureCounter(STATS, GLOBAL_STATS, { statsId: GLOBAL_STATS, counters: {} });
+    await db.mutate({ formationId: STATS, scopeValue: GLOBAL_STATS, ops });
+  }
 }
 
 export interface Odometer {
@@ -107,6 +119,7 @@ const AI_LIMIT_PER_WINDOW = 30; // per user per window -- protects a gym's LLM b
  * Redis INCR+EXPIRE rate-limit pattern, as a RainDB token.
  */
 export async function checkAiRateLimit(userId: string): Promise<{ allowed: boolean; remaining: number }> {
+  await ensureCounter(STATS, `ai:${userId}`, { statsId: `ai:${userId}`, counters: {} });
   const vals = await db.mutateAndRead({
     formationId: STATS,
     scopeValue: `ai:${userId}`,

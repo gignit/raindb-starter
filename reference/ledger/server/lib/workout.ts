@@ -81,7 +81,9 @@ export async function createCategory(input: {
     userId: input.userId,
     parentId: input.parentId || "root",
     name: input.name,
-    categoryPath: input.categoryPath,
+    // categoryPath is a required string in the schema -- default to the name
+    // (the human-readable path) when the caller doesn't supply a nested path.
+    categoryPath: input.categoryPath ?? input.name,
     sortOrder: input.sortOrder ?? 0,
     metricSchema: input.metricSchema,
   };
@@ -95,19 +97,26 @@ export async function readCategory(categoryId: string): Promise<Category | null>
   return (d?.payload as Category | undefined) ?? null;
 }
 
-/** The immediate children of a parent, for THIS user -- O(pageSize) grab. */
+/** The immediate children of a parent, for THIS user -- O(pageSize) grab.
+ *
+ *  NOTE on the prefix: index path inputs are canonically ENCODED in storage
+ *  (a natural-string segment like "root" is stored base64 as "cm9vdA~b64"; a
+ *  UUID segment is stored raw). listKeys matches the RAW prefix, so we can only
+ *  safely prefix on the userId (a UUID, stored raw) and filter parentId from the
+ *  read payloads. Listing one user's categories is still O(pageSize).
+ */
 export async function listChildCategories(userId: string, parentId: string, limit = 200): Promise<Category[]> {
   // template: indexes/ref-workout-categories/by-parent/{userId}/{parentId}/{categoryId}/latest.json
   const page = await db.listKeys({
     formationId: CATEGORIES,
     indexId: "by-parent",
-    opts: { first: limit, prefix: `${userId}/${parentId}/` },
+    opts: { first: limit, prefix: `${userId}/` },
   });
   const ids2 = page.keys.map((k) => k.key.split("/").at(-2)).filter((v): v is string => typeof v === "string");
   const out: Category[] = [];
   for (const id of ids2) {
     const c = await readCategory(id);
-    if (c) out.push(c);
+    if (c && c.parentId === (parentId || "root")) out.push(c);
   }
   out.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
   return out;

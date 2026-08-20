@@ -79,19 +79,20 @@ function generateToken(user: Pick<User, "userId" | "email" | "name" | "role">, s
   );
 }
 
-/** Write a revocable session token; the formation autoGens the sessionId. */
+/** Write a revocable session token. Mint the sessionId here (not via autoGen)
+ *  so the exact id is known for BOTH the token write and the JWT: the goja host
+ *  ctx.db.writeToken returns only the dropletId, not the minted scopeValue, so
+ *  we cannot rely on the write result to learn an auto-generated sessionId. */
 async function createSession(user: User, meta: { userAgent?: string } = {}): Promise<string> {
-  const env = await db.writeToken({
+  const sessionId = ids.uuidv7();
+  await db.writeToken({
     formationId: SESSIONS,
-    payload: {
-      userId: user.userId, email: user.email, name: user.name, role: user.role ?? "member",
+    payload: payload({
+      sessionId, userId: user.userId, email: user.email, name: user.name, role: user.role ?? "member",
       userAgent: meta.userAgent ?? "", createdAt: new Date().toISOString(),
-    },
+    }),
   });
-  // The ref-session formation autoGens the sessionId; the write envelope returns
-  // it as scopeValue (db.writeToken now surfaces the full envelope). That
-  // sessionId is what the JWT carries + what logout deletes.
-  return env.scopeValue ?? env.dropletId;
+  return sessionId;
 }
 
 // --------------------------------------------------------------- register/login
