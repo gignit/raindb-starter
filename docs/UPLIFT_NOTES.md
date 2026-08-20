@@ -673,3 +673,38 @@ NET: the model is not theory -- I watched it run on 23k prod records. The starte
 confidently teach: O(1) grab for interactive reads (any scale), the full analytical
 engine for real analytics (window fns/CTE/percentiles), freshness bookmark to merge
 the fresh tail, auto-cascade compaction. Describe by capability; never name the engine.
+
+## THE SPEED + THE FAMILY OF EXAMPLES (operator -- governs the starter's TONE, via RESTRAINT)
+
+THE SPEED SUPERPOWER (I attest from the tech + the live run): 241ms GROUP BY / 82ms
+window+CTE over 23k is COLUMNAR analytical perf that scales by what you SCAN, not what
+you STORE -- predicate pushdown + min/max stats + the compaction cascade (watched
+45->11->4 files) mean 20k and 100M entries return in COMPARABLE time (the engine reads
+only relevant column-chunks either way). Not a RainDB trick -- inherited from the
+columnar-datalake foundation; RainDB AUTOMATES the compaction/ETL everyone else does by
+hand. Honest bound: NOT for the sub-ms hot-loop edge case; for nearly everything else you
+get datalake-scale analytics + zero ETL + O(1) interactive grabs, at any scale.
+
+THE FAMILY (tenants will have access -- so the starter HINTS, does NOT teach these):
+- ~/src/raindb-logjammer: a Splunk client+server replacement. Logs as droplets ->
+  auto-flow into the datalake -> full analytical SQL over logs, no separate index tier.
+- ~/src/raindb-kafka: Kafka PATTERNS (intake + consumption via descIndex/listSince cursor
+  tailing + tokens for offsets/counters) BUT data auto-flows straight into the datalake --
+  eliminates the Kafka->warehouse gymnastics (Connect/sink/dedup). One system = the
+  streaming log AND the analytical store.
+UNIFYING TRUTH they reveal: a droplet stream IS both an event log AND a datalake table
+simultaneously -- RainDB collapses log-pipeline + streaming + warehouse into ONE thing.
+
+HOW THIS SHAPES THE STARTER = RESTRAINT (subtraction, not addition):
+- Do NOT turn the starter into a log-analytics or streaming demo -- logjammer/kafka OWN
+  those and tenants have access. Ledger+Workouts stay focused on their relatable domain.
+- PLANT THE SEED in framing/docs (1-2 pointed sentences + links, NOT a tutorial): "the
+  same droplet-in-formation model scales to millions at the same query speed, tails in
+  real time by cursor, and IS already your datalake -- see the logjammer (log platform)
+  and kafka (streaming backbone) examples for this same foundation wearing other faces."
+- AGENTS.md "when your real app needs X, look at Y" table -> point streaming/log-analytics
+  to logjammer/kafka so the agent knows the foundation GENERALIZES without the starter
+  proving it.
+DESIGN PRINCIPLE: showcase enough to earn "more than meets the eye," OPEN THE DOOR to the
+siblings, don't drown them. The starter's job is to make an agent FEEL the foundation is
+deep, then hand off. Describe by capability; never name the engine.
