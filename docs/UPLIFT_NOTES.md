@@ -1287,3 +1287,20 @@ GraphQL vs raw-S3 (extend counters.py) -> then probe. (3) draft token: prove del
 mutate-coalescing GraphQL vs raw-S3 -> fill token.delete in the SDK -> probe. (4) files/startSSE/
 mintActivitySubscription/versionHistory: GraphQL roots mostly proven (reserveDirectUpload/readFloat,
 listSince, mintWireSubscribeToken, listDroplets) -> probes.
+
+## M1 PROGRESS (milestone-driven, autonomous)
+- M1.1 DONE: draft-token GraphQL contract green vs vector-sandbox1 + S3 oracle (prime
+  live/draft-token-contract 91c1624e; queries.DELETE_TOKEN, verify.counters.assert_token_vanished,
+  draft_token fixture, drafts/ area). Red-checked.
+- M1.2 DONE: bolt-sdk token.delete LIVE via boltGraphQL (deleteToken op) -- 133 tests pass, pushed
+  feat/files-graphql-fallback bb11249. queryEntityRowsFresh also done (8b8228c).
+- M1.3 DONE: codex counter-token GraphQL contract (window INCR + delta/total fold, raw-S3 cross-
+  checked) -- VERIFIED green on my machine (2 passed 30.30s), reviewed vs coder (real values, S3
+  oracle, record.contract, reusable lib/ drivers running_total_state/drive_running_total_delta +
+  _generic_formation_ready stats-compare fix). prime test/live-counter-token-contract e8875865
+  (stacks on the draft commit). ACCEPTED.
+- Branch consolidation: test/live-counter-token-contract = the Phase-1 live-contracts branch
+  (both draft + counter). Merge to main at M1.7.
+- NEXT M1.4: probes in raindb-test-lightning-goja for the bolt re-representations
+  (queryEntityRowsFresh, versionHistory, files.reserveUpload, startSSE, mintActivitySubscription,
+  token.delete, counter mutateAndRead, draft coalescing), then sync-shared -> pod, run-matrix.
