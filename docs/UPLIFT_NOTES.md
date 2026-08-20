@@ -1087,3 +1087,46 @@ reference/ shows each pattern cleanly; app/ + AGENTS task->file table shows how 
 readability per file even as feature count grows -- gold-standard = each file obviously-correct.
 Family restraint holds: hint the redis-replacement via the token counters ("instant atomic
 counters + live stats, no extra infra"), never name Redis; the full redis story = sibling example.
+
+## PHASE 1 DISCIPLINE -- tests/live "eventually complete" framework (operator, SACRED)
+
+CRITICAL: every primitive I prove in Phase 1 AUGMENTS the tests/live SUITE with reusable
+helpers/functions in lib/ -- NOT one-off code in a test file. Goal: the suite gets more
+complete with each pattern, so the next agent inherits it. Rules (tests/live/README.md):
+1. SEARCH lib/ FIRST before writing ANY helper: grep -rn "def <verb>" lib/, skim
+   lib/verify/ + lib/clients/graphql.py. You cannot "extend not fork" if you never look.
+2. EXTEND lib/ in place if it almost does it; only add a NEW lib/ primitive if nothing
+   exists. Copy-pasting a helper into a test file is the anti-pattern (7 divergent
+   key-extractors is why this rule exists). Prefer the RICHEST existing assertion
+   (assert_graphql_error_envelope over a code-only check).
+3. NEVER speculative surface: no lib/ helper with zero callers; DELETE a helper when its
+   last caller goes. Every lib/ fn traceable to the test that demanded it.
+4. READ shapes with coder BEFORE any payload (SDL=wire, formation schema=payload, Go
+   sdk=semantics). Never guess a field name.
+5. FAIL-FAST: each step verifies its own result + aborts; cheap-first ordering.
+6. CROSS-CHECK vs raw S3 (lib/verify/s3.py) -- the platform can't mark its own homework.
+7. record.contract(...) pins each shape's rationale (decision + git commits + coder cmd).
+
+THREE TIERS (use each where strongest): make test (Go unit, fakes) | tests/live/gosdk (Go
+live-SDK, real S3 shape + round-trip COUNT -- catches "correct value but 2x S3 cost") |
+tests/live/tests (Python, deployed system over the network). The round-trip-COUNT dimension
+matters for the draft writeDelay proof (N keystrokes -> few S3 PUTs) + queryEntityRowsFresh.
+
+lib/ surface to REUSE/EXTEND (from README layout): config.py, profiles.py, queries.py (one
+GraphQL doc per op), provision.py (idempotent check-before-create builders), registry.py
+(durable reuse), clients/{graphql,cli}.py, verify/{hashing,s3,chain,listing,indexes,records}.py.
+So Phase-1 SDK proofs land as: a queries.py op doc + a provision.py builder + a verify/
+assertion + (for round-trip counts) a gosdk/*_live_test.go with ListCounter -- each REUSABLE.
+
+Phase-1 primitives to prove THIS way (each -> a lib/ helper, not a one-off):
+- redis+ counter token (mutateAndRead delta/total + windowed INCR) -> a provision.py token
+  builder + a verify assertion on counter fold + a gosdk round-trip-count case.
+- draft writeDelay+autoCache coalescing (N writes -> few S3 PUTs) -> gosdk ListCounter proof
+  + a lib helper to write-N-and-count.
+- queryEntityRowsFresh (row-list merge, fail-loud) -> a lib verify helper that asserts the
+  merged tail matches raw-S3 newest, reused by any freshness test.
+- draft delete-on-publish path -> a provision/verify helper proving the token vanishes.
+- per-scope tag token isolation (journal vs workout same shape, natural-path) -> a verify
+  helper asserting two independent tag ledgers from one formation.
+- revisions:true v1+v2 replace -> extend the existing float/revisions verify (search first).
+Merge bolt-sdk feat->main + pin AFTER the primitives are green in tests/live.
