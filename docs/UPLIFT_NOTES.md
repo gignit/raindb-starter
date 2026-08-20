@@ -934,3 +934,33 @@ This badge is itself a teaching artifact -- it makes the eventual-consistency VI
 reassuring, encoding the judgment: fresh index = instant; analytical chart = pooled + honest
 "updating ~Nm". Never name the engine; describe as "RainDB's auto-datalake refreshes your
 analytics every few minutes; your live data is always instant."
+
+## CANONICAL TWO-PLANE PROOF -- SQL before/after + instant index (drove it, sdktest-stream)
+
+Ran the FULL sequence on a caught-up formation (sdktest-stream) -- the definitive
+before/after the starter teaches:
+
+STEP 1 -- SQL BEFORE (freshnessStatus:CURRENT, snapshot==current 019ff527):
+  GROUP BY kind -> probe n=3 sum=60, freshness-test n=1 sum=42.  (38ms)
+
+STEP 2 -- WROTE droplet kind="freshness-demo" value=999
+  -> dropletId 01a01d9e-e02c-77d2-a990-5764afe30e02, scopeValue a88ef825-... (clean, no warns).
+
+STEP 3 -- SQL AFTER (same query, immediately):
+  -> STILL probe n=3, freshness-test n=1. THE freshness-demo ROW IS ABSENT (value 999 not in
+     the aggregate yet). freshnessStatus flipped CURRENT -> BEHIND. bookmark:
+       snapshotDropletId 019ff527...  (what SQL sees, unchanged)
+       currentDropletId  01a01d9e-e02c-... (MY write)
+       indexPrefix .../by-update/  (where to harvest the tail)
+  This IS the "I'm behind, here's the cursor gap" signal, exact.
+
+STEP 4 -- SAME INSTANT, fresh index (droplet_read_latest by-id/a88ef825):
+  -> returns my droplet COMPLETELY + INSTANTLY: kind=freshness-demo, value=999. No lag.
+
+CONTRAST AT THE SAME MOMENT: SQL aggregate does NOT have value=999 (BEHIND); the index
+HAS it instantly. Same data, two planes. SQL catches up at the next ~5-min pool. This is
+the whole thesis, PROVEN not asserted -- and exactly what the workout freshness badge
+encodes: after a workout the chart (history_sql) is BEHIND -> "updating, ~Nm" while the
+just-logged set is instant via the index (session_fresh), so nothing feels lost while the
+chart catches up. The bookmark (snapshot vs current dropletId + indexPrefix) is precisely
+what queryEntityRowsFresh harvests for a ROW-LIST, and what the badge reads for a CHART.
