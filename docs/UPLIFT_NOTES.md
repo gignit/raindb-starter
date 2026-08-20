@@ -1389,3 +1389,26 @@ ONE-BRANCH-PER-REPO (never switch off these):
 - raindb-starter:     uplift/2026-08                     (FitLedger app)
 All clean. codex's versionHistory host fix is DONE + deployed to prod (e37e6ada); probe
 bolts need a republish (pre-fix SDK embedded) to show versionHistory green -- redeploy only.
+
+## M6a DEPLOYED -- FitLedger is LIVE on vector-sandbox1
+URL: https://stormfront-7c0095a8e994.raindb.io  (boltId 01a01e5a-f7ff-75b0-bbf8-7c0095a8e994, active)
+/api/health -> {"status":"ok","app":"fitledger"}. Server+client both live.
+ROOT CAUSE of the deploy 500: the server-side publish gate REQUIRES the capabilities' expected
+secrets to be staged; deploying WITHOUT --from-secrets 500s (a platform bug -- should be 400 with a
+clear "missing secrets" message; codex confirming). FIX: `--from-secrets <json>` stages the 5 secrets
+(FL_SESSION_SECRET random + RAINDB_GRAPHQL_ENDPOINT/KEY + LLM_API_BASE/KEY) AND satisfies the gate.
+Correct deploy command (for setup.sh):
+  raindb-cli --profile <p> lightning bolt deploy --name fitledger-ref --engine goja \
+    --source reference/ledger/server --entry index.ts \
+    --capabilities <abs>/config/capabilities.json --routes <abs>/config/routes.json \
+    --deployment <abs>/config/deployment.json --client-dist ../../../client/dist \
+    --from-secrets <abs>/.fitledger-secrets.json
+KEY DEPLOY FACTS (for M5 setup.sh + deploy.sh fix):
+- The platform RE-BUILDS from --source via its own esbuild; --entry is RELATIVE to --source (index.ts,
+  NOT the prebuilt dist/main.cjs). --client-dist is joined onto --source so must be relative
+  (../../../client/dist from reference/ledger/server).
+- Removed the old server/ dir (broken prisma imports the platform esbuild tripped on -- superseded by
+  reference/ledger/server/). deploy.sh still references formations/*-config.json + server/index.ts --
+  needs updating in M5 to the reference/ paths + --from-secrets on first deploy.
+- .fitledger-secrets.json is gitignored (real values). Secrets now staged; drop --from-secrets on
+  redeploys unless values change.
