@@ -1354,3 +1354,22 @@ prefix-narrowing on this runtime and returns 0. So the suspect is prefix-narrowi
 scopeValue?) NOT the primitive logic (unit-tested). This is a genuine SDK finding the harness caught.
 DECISION (lead): defer as a tracked SDK investigation -- 1 probe, not app-blocking (app can list +
 client-filter, or fix the SDK prefix). Delegate the trace to codex. Do NOT block M1 on it.
+
+## versionHistory ROOT CAUSE (codex found, coder+git-confirmed) -- HOST fix, live-contract-first
+SMOKING GUN: scope values are HASH-ENCODED on disk (base64(scopeValue)~b64 via ShouldHashValue/
+HashInput, renderer.go:219), but db.versionHistory sends the RAW `${scopeValue}/` prefix (db.ts:742)
+-> lists the SEMANTIC path entities/<f>/<rawScope>/ while droplets live at entities/<f>/<b64>~b64/ ->
+0 match. (My earlier raw-S3 "UUID scope dirs" were actually the hash-encoded values.) list.go:489/547
+concatenate the raw suffix; ab54aa37 added Prefix as raw intra-formation narrowing; f07dd59c: user
+path inputs are canonically encoded, reads+writes must agree; SDK 3a6d0a0a versionHistory's mocked
+test never exercised path transformation. I independently verified the OTHER half: autoGenId byDefault
+HONORS my explicit noteId (generated_fields.go:112) so scopeValue was correct -- the bug is purely the
+raw-vs-encoded prefix.
+FIX (codex owns, live-contract-first -- HOST capability, SDK can't reproduce formation hash-encoding
+in TS): add a semantic `scopeValue` to the listDroplets GraphQL/host input (mutually exclusive with raw
+prefix), resolve it via the formation's canonical path renderer (pkg/paths) before listing, then db.ts
+passes scopeValue not a manufactured prefix. Proof: a Python live contract writes 2 revisions under a
+natural scope, verifies the ~b64 objects in raw S3, requires GraphQL semantic-scope listing to return
+both. Codex has a draft contract (tests/live/tests/droplet/test_list_scope.py) started.
+DECISION (lead): NON-BLOCKING for the app -- delegate the complete fix to codex as a dedicated live-
+contract-first task; versionHistory folds into the app when it lands. 5/6 M1 primitives proven. Proceed.
