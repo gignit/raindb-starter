@@ -1,71 +1,92 @@
-// App.tsx -- the starter UI: a notes board + an AI assistant panel.
+// App.tsx -- the starter UI: a notes workspace, an AI assistant, and a SQL
+// analytics view, in a tabbed shell.
 //
-// Deliberately small. Two columns:
-//   left:  create + list notes (the CRUD surface -> /api/notes)
-//   right: chat with the assistant (SSE stream -> /api/chat); it can read
-//          the notes via its list_notes tool, so ask it about them.
+// Three tabs, each a full-width view over one RainDB pattern:
+//   Notes     -> index-plane CRUD (/api/notes): instant read-your-writes.
+//   Assistant -> the @raindb/agent loop (/api/chat), streamed live over SSE.
+//   Analytics -> Periscope SQL over the SAME droplets (/api/stats) with a
+//                freshness badge (the eventually-consistent analytical plane).
 //
-// Replace this whole file when you build your app. The api.ts module and
-// the SSE consumption pattern in ChatPanel are the parts worth keeping.
+// Replace this file with your app. api.ts + the SSE consumption in ChatPanel
+// + the two-plane split (index vs SQL) are the parts worth keeping.
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "github-markdown-css/github-markdown-dark.css";
-
-// Shared renderer: GitHub-flavored markdown (tables, strikethrough, task
-// lists, autolinks) styled by github-markdown-css. Used for note bodies AND
-// assistant replies -- one markdown pipeline for the whole app.
-function Md({ children }: { children: string }) {
-  return <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>;
-}
 import {
   listNotes, createNote, streamChat, getStats, type Note, type ChatEvent,
   type AuthorStat, type Freshness,
 } from "./api";
 
+// One markdown pipeline (GFM) for note bodies AND assistant replies.
+function Md({ children }: { children: string }) {
+  return <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>;
+}
+
+// A stable-ish color + initial for an author avatar chip.
+function avatar(name: string): { initial: string; hue: number } {
+  const s = (name || "?").trim();
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 360;
+  return { initial: (s[0] || "?").toUpperCase(), hue: h };
+}
+
+function relTime(iso: string): string {
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return "";
+  const diff = Date.now() - t;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  const d = Math.floor(h / 24);
+  if (d < 7) return `${d}d ago`;
+  return new Date(iso).toLocaleDateString();
+}
+
+type Tab = "notes" | "assistant" | "analytics";
+
 export default function App() {
+  const [tab, setTab] = useState<Tab>("notes");
   return (
-    <div className="shell">
-      <header className="header">
-        <h1>RainDB Starter</h1>
-        <p>
-          Notes live as immutable droplets in the <code>starter-notes</code> formation.
-          Read them two ways: an <strong>index</strong> lookup (instant, any scale) or
-          <strong> analytical SQL</strong> over the same data. The assistant reads them
-          through an agent tool. No database server, no ORM, no migrations.
-        </p>
+    <div className="app">
+      <header className="topbar">
+        <div className="brand">
+          <span className="logo" aria-hidden>◆</span>
+          <div>
+            <div className="brand-name">RainDB Starter</div>
+            <div className="brand-sub">notes as immutable droplets &middot; one data model, three surfaces</div>
+          </div>
+        </div>
+        <nav className="tabs">
+          <button className={tab === "notes" ? "tab on" : "tab"} onClick={() => setTab("notes")}>Notes</button>
+          <button className={tab === "assistant" ? "tab on" : "tab"} onClick={() => setTab("assistant")}>Assistant</button>
+          <button className={tab === "analytics" ? "tab on" : "tab"} onClick={() => setTab("analytics")}>Analytics</button>
+        </nav>
       </header>
-      <main className="columns">
-        <NotesPanel />
-        <ChatPanel />
+      <main className="view">
+        {tab === "notes" && <NotesView />}
+        {tab === "assistant" && <ChatView />}
+        {tab === "analytics" && <AnalyticsView />}
       </main>
-      <AnalyticsPanel />
     </div>
   );
 }
 
-// ---- Analytics (AXIS 2: Periscope SQL + freshness) ---------------------
-//
-// The SAME note droplets are queryable as an analytical SQL table. This panel
-// runs a GROUP BY (count by author) and shows a FRESHNESS badge: the SQL plane
-// is eventually consistent (it pools every ~5 min), so right after you add
-// notes it may be "updating..." while the index-based Notes list already shows
-// them. That contrast IS the lesson -- index for read-your-writes, SQL for
-// analytics, freshness badge for the gap.
+// ============================================================ Notes (index)
 
-function AnalyticsPanel() {
-  const [stats, setStats] = useState<AuthorStat[]>([]);
-  const [freshness, setFreshness] = useState<Freshness | null>(null);
+function NotesView() {
+  const [notes, setNotes] = useState<Note[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [composerOpen, setComposerOpen] = useState(false);
+  const [filter, setFilter] = useState("");
 
   const reload = useCallback(async () => {
-    setLoading(true);
     try {
-      const r = await getStats();
-      setStats(r.stats);
-      setFreshness(r.freshness);
+      setNotes(await listNotes());
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -74,83 +95,80 @@ function AnalyticsPanel() {
     }
   }, []);
 
-  useEffect(() => {
-    void reload();
-  }, [reload]);
+  useEffect(() => { void reload(); }, [reload]);
+
+  const shown = useMemo(() => {
+    const q = filter.trim().toLowerCase();
+    if (!q) return notes;
+    return notes.filter(
+      (n) =>
+        n.title.toLowerCase().includes(q) ||
+        n.authorName.toLowerCase().includes(q) ||
+        (n.tags ?? []).some((t) => t.toLowerCase().includes(q)),
+    );
+  }, [notes, filter]);
 
   return (
-    <section className="panel analytics">
-      <div className="analytics-head">
-        <h2>Analytics (SQL)</h2>
-        {freshness && (
-          <span className={`freshness ${freshness.behind ? "behind" : "current"}`}>
-            {freshness.behind
-              ? "updating... (new notes pool into SQL every ~5 min)"
-              : "up to date"}
-          </span>
-        )}
-        <button className="refresh" onClick={() => void reload()} disabled={loading}>
-          {loading ? "..." : "refresh"}
+    <div className="notes-view">
+      <div className="view-head">
+        <div>
+          <h1>Notes</h1>
+          <p className="sub">
+            Each save is a new immutable droplet in <code>starter-notes</code>, read back
+            instantly by its index. {notes.length} note{notes.length === 1 ? "" : "s"}.
+          </p>
+        </div>
+        <button className="btn primary" onClick={() => setComposerOpen((v) => !v)}>
+          {composerOpen ? "Close" : "New note"}
         </button>
       </div>
-      <p className="meta">
-        <code>SELECT authorName, COUNT(*) FROM entity."starter-notes" GROUP BY authorName</code>
-        {" "}-- analytical SQL over the same droplets, no ETL.
-      </p>
-      {error && <p className="error">{error}</p>}
-      <table className="stats-table">
-        <thead>
-          <tr><th>Author</th><th>Notes</th><th>Latest</th></tr>
-        </thead>
-        <tbody>
-          {stats.map((s) => (
-            <tr key={s.authorName}>
-              <td>{s.authorName}</td>
-              <td>{s.notes}</td>
-              <td>{s.latest ? new Date(s.latest).toLocaleString() : "-"}</td>
-            </tr>
-          ))}
-          {stats.length === 0 && !error && (
-            <tr><td colSpan={3} className="meta">no rows yet -- add notes, then wait for the next pool</td></tr>
-          )}
-        </tbody>
-      </table>
-    </section>
+
+      {composerOpen && <Composer onCreated={() => { setComposerOpen(false); void reload(); }} />}
+
+      <div className="toolbar">
+        <input
+          className="search"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          placeholder="Filter by title, author, or tag..."
+        />
+      </div>
+
+      {error && <div className="banner error">{error}</div>}
+      {loading ? (
+        <div className="grid">{[0, 1, 2, 3].map((i) => <div key={i} className="card skeleton" />)}</div>
+      ) : shown.length === 0 ? (
+        <div className="empty">
+          <div className="empty-mark">◆</div>
+          <p>{notes.length === 0 ? "No notes yet." : "No notes match that filter."}</p>
+          {notes.length === 0 && <button className="btn primary" onClick={() => setComposerOpen(true)}>Create the first note</button>}
+        </div>
+      ) : (
+        <div className="grid">
+          {shown.map((n) => <NoteCard key={n.noteId} note={n} />)}
+        </div>
+      )}
+    </div>
   );
 }
 
-// ---- Notes -------------------------------------------------------------
-
-function NotesPanel() {
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [author, setAuthor] = useState("me");
+function Composer({ onCreated }: { onCreated: () => void }) {
+  const [author, setAuthor] = useState(() => localStorage.getItem("author") || "me");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [tags, setTags] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const reload = useCallback(async () => {
-    try {
-      setNotes(await listNotes());
-      setError(null);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    }
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !author.trim()) return;
     setBusy(true);
     try {
-      await createNote({ author: author.trim(), title: title.trim(), body });
-      setTitle("");
-      setBody("");
-      await reload();
+      const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
+      await createNote({ author: author.trim(), title: title.trim(), body, tags: tagList });
+      localStorage.setItem("author", author.trim());
+      onCreated();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -159,61 +177,59 @@ function NotesPanel() {
   };
 
   return (
-    <section className="panel">
-      <h2>Notes</h2>
-      <form onSubmit={submit} className="note-form">
-        <input value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="author" />
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="title" />
-        <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="write something..." rows={3} />
-        <button disabled={busy || !title.trim()}>{busy ? "saving..." : "add note"}</button>
-      </form>
-      {error && <p className="error">{error}</p>}
-      <ul className="notes">
-        {notes.map((n) => (
-          <li key={n.noteId} className="note">
-            <div className="note-head">
-              <strong>{n.title}</strong>
-              <span className="meta">{n.authorName}</span>
-            </div>
-            {n.body && (
-              <div className="markdown-body note-body">
-                <Md>{n.body}</Md>
-              </div>
-            )}
-            <span className="meta">{new Date(n.createdAt).toLocaleString()}</span>
-          </li>
-        ))}
-        {notes.length === 0 && !error && <li className="meta">no notes yet -- add one</li>}
-      </ul>
-    </section>
+    <form className="composer card" onSubmit={submit}>
+      <div className="composer-row">
+        <input className="composer-author" value={author} onChange={(e) => setAuthor(e.target.value)} placeholder="author" />
+        <input className="composer-title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" autoFocus />
+      </div>
+      <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write something... (markdown supported)" rows={4} />
+      <div className="composer-foot">
+        <input className="composer-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="tags, comma, separated" />
+        <button className="btn primary" disabled={busy || !title.trim()}>{busy ? "Saving..." : "Save note"}</button>
+      </div>
+      {error && <div className="banner error">{error}</div>}
+    </form>
   );
 }
 
-// ---- Chat --------------------------------------------------------------
+function NoteCard({ note }: { note: Note }) {
+  const { initial, hue } = avatar(note.authorName);
+  const edited = !!note.updatedAt && note.updatedAt !== note.createdAt;
+  return (
+    <article className="card note">
+      <header className="note-top">
+        <span className="chip" style={{ background: `hsl(${hue} 45% 28%)`, color: `hsl(${hue} 80% 82%)` }}>{initial}</span>
+        <div className="note-meta">
+          <span className="note-author">{note.authorName}</span>
+          <span className="note-time">{relTime(note.updatedAt || note.createdAt)}{edited ? " · edited" : ""}</span>
+        </div>
+      </header>
+      <h3 className="note-title">{note.title}</h3>
+      {note.body && <div className="markdown-body note-body"><Md>{note.body}</Md></div>}
+      {(note.tags ?? []).length > 0 && (
+        <div className="tags">
+          {note.tags!.map((t) => <span key={t} className="tag">#{t}</span>)}
+        </div>
+      )}
+    </article>
+  );
+}
+
+// ======================================================== Assistant (agent)
 
 interface ChatLine {
   kind: "user" | "assistant" | "error";
   text: string;
-  /** For assistant turns: the agent's activity trace, built LIVE from the SSE
-   *  AgentEvent stream (nothing is persisted server-side -- the thinking is
-   *  shown straight from the frames as they arrive). Each step keeps the full
-   *  event detail so the UI can show what the agent actually did. */
   trace?: TraceStep[];
 }
-
-// One rendered line of the live agent trace. Mirrors the @raindb/agent
-// AgentEvent shapes (thinking / tool-call / tool-result / tool-error) -- we
-// keep the tool name, args, result preview, timing, and ok flag so the trace
-// shows the real reasoning, not a terse label.
 interface TraceStep {
   kind: "thinking" | "tool-call" | "tool-result" | "tool-error";
   label: string;
-  detail?: string; // args (call) or result preview (result) or error text
+  detail?: string;
   ok?: boolean;
   durationMs?: number;
 }
 
-/** Compact one-line JSON preview for tool args / results. */
 function preview(v: unknown, max = 300): string {
   let s: string;
   try {
@@ -225,7 +241,9 @@ function preview(v: unknown, max = 300): string {
   return s.length > max ? s.slice(0, max) + "..." : s;
 }
 
-function ChatPanel() {
+const SUGGESTIONS = ["summarize my notes", "who wrote the most notes?", "what is this app?"];
+
+function ChatView() {
   const [lines, setLines] = useState<ChatLine[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
@@ -233,26 +251,16 @@ function ChatPanel() {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
   }, [lines]);
 
-  const send = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const message = input.trim();
+  const runTurn = async (message: string) => {
     if (!message || busy) return;
     setInput("");
     setBusy(true);
-    // The live activity trace for THIS turn, built straight from the streamed
-    // AgentEvents. Nothing is recorded server-side -- these frames arrive over
-    // SSE and we render them as they come.
     const trace: TraceStep[] = [];
-    setLines((ls) => [
-      ...ls,
-      { kind: "user", text: message },
-      { kind: "assistant", text: "", trace }, // placeholder, fills as events stream
-    ]);
+    setLines((ls) => [...ls, { kind: "user", text: message }, { kind: "assistant", text: "", trace }]);
 
-    // Update the in-flight assistant line (always the last line) in place.
     const patchLast = (patch: Partial<ChatLine>) =>
       setLines((ls) => {
         const next = ls.slice();
@@ -261,9 +269,8 @@ function ChatPanel() {
         return next;
       });
 
-    // Each SSE frame is a full @raindb/agent AgentEvent -- keep its detail
-    // (tool name + args + result preview + timing) so the trace shows what the
-    // agent actually did, not just that "a tool was called".
+    // Each SSE frame is a full @raindb/agent AgentEvent -- rendered live, nothing
+    // persisted server-side.
     const onEvent = (ev: ChatEvent) => {
       if (ev.type === "thinking") {
         trace.push({ kind: "thinking", label: `Thinking (step ${String(ev.iteration ?? "")})`.trim() });
@@ -271,30 +278,19 @@ function ChatPanel() {
       } else if (ev.type === "tool-call") {
         const args = (ev.args ?? {}) as unknown;
         const hasArgs = args && typeof args === "object" && Object.keys(args as object).length > 0;
-        trace.push({
-          kind: "tool-call",
-          label: `Calling tool: ${String(ev.toolName)}`,
-          ...(hasArgs ? { detail: preview(args) } : {}),
-        });
+        trace.push({ kind: "tool-call", label: `Calling ${String(ev.toolName)}`, ...(hasArgs ? { detail: preview(args) } : {}) });
         patchLast({ trace: [...trace] });
       } else if (ev.type === "tool-result") {
         trace.push({
           kind: "tool-result",
-          label: `Tool ${String(ev.toolName ?? "")} ${ev.ok === false ? "failed" : "returned"}`.trim(),
+          label: `${String(ev.toolName ?? "")} ${ev.ok === false ? "failed" : "returned"}`.trim(),
           ok: ev.ok !== false,
           ...(typeof ev.durationMs === "number" ? { durationMs: ev.durationMs } : {}),
-          ...(ev.preview !== undefined || ev.result !== undefined
-            ? { detail: preview(ev.preview ?? ev.result) }
-            : {}),
+          ...(ev.preview !== undefined || ev.result !== undefined ? { detail: preview(ev.preview ?? ev.result) } : {}),
         });
         patchLast({ trace: [...trace] });
       } else if (ev.type === "tool-error") {
-        trace.push({
-          kind: "tool-error",
-          label: `Tool ${String(ev.toolName ?? "")} error`.trim(),
-          ok: false,
-          detail: String(ev.error ?? ""),
-        });
+        trace.push({ kind: "tool-error", label: `${String(ev.toolName ?? "")} error`.trim(), ok: false, detail: String(ev.error ?? "") });
         patchLast({ trace: [...trace] });
       } else if (ev.type === "final") {
         const content = String(ev.content ?? "");
@@ -316,17 +312,31 @@ function ChatPanel() {
   };
 
   return (
-    <section className="panel">
-      <h2>Assistant</h2>
+    <div className="chat-view">
+      <div className="view-head">
+        <div>
+          <h1>Assistant</h1>
+          <p className="sub">
+            An <code>@raindb/agent</code> loop that reads your notes through a tool. Its
+            thinking + tool calls stream live over SSE.
+          </p>
+        </div>
+      </div>
+
       <div className="chat-log" ref={scrollRef}>
         {lines.length === 0 && (
-          <p className="meta">
-            Try: &quot;summarize my notes&quot; or &quot;what is this app?&quot; -- events stream
-            live as the agent thinks and calls tools.
-          </p>
+          <div className="chat-empty">
+            <div className="empty-mark">✦</div>
+            <p>Ask the assistant about your notes -- watch it think and call tools live.</p>
+            <div className="suggestions">
+              {SUGGESTIONS.map((s) => (
+                <button key={s} className="suggestion" onClick={() => void runTurn(s)}>{s}</button>
+              ))}
+            </div>
+          </div>
         )}
         {lines.map((l, i) => (
-          <div key={i} className={`chat-line ${l.kind}${l.kind === "assistant" ? " markdown-body" : ""}`}>
+          <div key={i} className={`bubble ${l.kind}`}>
             {l.kind === "assistant" ? (
               <>
                 {l.trace && l.trace.length > 0 && (
@@ -334,15 +344,14 @@ function ChatPanel() {
                     <summary>
                       {l.text === ""
                         ? `thinking${".".repeat((l.trace.length % 3) + 1)}`
-                        : `thought process (${l.trace.length} step${l.trace.length === 1 ? "" : "s"})`}
+                        : `thought process · ${l.trace.length} step${l.trace.length === 1 ? "" : "s"}`}
                     </summary>
                     <ul className="thinking-steps">
                       {l.trace.map((t, j) => (
                         <li key={j} className={`trace-step ${t.kind}`}>
                           <span className="trace-label">
-                            {t.ok === false ? "x " : ""}
-                            {t.label}
-                            {typeof t.durationMs === "number" ? ` (${t.durationMs}ms)` : ""}
+                            {t.ok === false ? "✕ " : ""}{t.label}
+                            {typeof t.durationMs === "number" ? ` · ${t.durationMs}ms` : ""}
                           </span>
                           {t.detail && <code className="trace-detail">{t.detail}</code>}
                         </li>
@@ -351,26 +360,119 @@ function ChatPanel() {
                   </details>
                 )}
                 {l.text === "" && (!l.trace || l.trace.length === 0) ? (
-                  <span className="meta">thinking...</span>
+                  <span className="typing"><i /><i /><i /></span>
                 ) : (
-                  <Md>{l.text}</Md>
+                  <div className="markdown-body"><Md>{l.text}</Md></div>
                 )}
               </>
             ) : (
-              l.text
+              <span>{l.text}</span>
             )}
           </div>
         ))}
       </div>
-      <form onSubmit={send} className="chat-form">
+
+      <form onSubmit={(e) => { e.preventDefault(); void runTurn(input.trim()); }} className="chat-form">
         <input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={busy ? "waiting for the agent..." : "ask about your notes..."}
+          placeholder={busy ? "the agent is working..." : "Ask about your notes..."}
           disabled={busy}
         />
-        <button disabled={busy || !input.trim()}>send</button>
+        <button className="btn primary" disabled={busy || !input.trim()}>Send</button>
       </form>
-    </section>
+    </div>
+  );
+}
+
+// ======================================================== Analytics (SQL)
+
+function AnalyticsView() {
+  const [stats, setStats] = useState<AuthorStat[]>([]);
+  const [freshness, setFreshness] = useState<Freshness | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await getStats();
+      setStats(r.stats);
+      setFreshness(r.freshness);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void reload(); }, [reload]);
+
+  const total = stats.reduce((a, s) => a + s.notes, 0);
+  const max = stats.reduce((a, s) => Math.max(a, s.notes), 0) || 1;
+
+  return (
+    <div className="analytics-view">
+      <div className="view-head">
+        <div>
+          <h1>Analytics</h1>
+          <p className="sub">
+            The same droplets, queried as an analytical SQL table -- no ETL, no separate
+            warehouse.
+          </p>
+        </div>
+        <div className="head-actions">
+          {freshness && (
+            <span className={`freshness ${freshness.behind ? "behind" : "current"}`}>
+              <span className="dot" />
+              {freshness.behind ? "updating -- pools every ~5 min" : "up to date"}
+            </span>
+          )}
+          <button className="btn ghost" onClick={() => void reload()} disabled={loading}>
+            {loading ? "..." : "Refresh"}
+          </button>
+        </div>
+      </div>
+
+      <div className="stat-cards">
+        <div className="stat-card"><div className="stat-num">{total}</div><div className="stat-label">notes total</div></div>
+        <div className="stat-card"><div className="stat-num">{stats.length}</div><div className="stat-label">authors</div></div>
+        <div className="stat-card"><div className="stat-num">{max}</div><div className="stat-label">most by one author</div></div>
+      </div>
+
+      <div className="card query-card">
+        <code>SELECT authorName, COUNT(*) FROM entity."starter-notes" GROUP BY authorName</code>
+      </div>
+
+      {error && <div className="banner error">{error}</div>}
+      {loading ? (
+        <div className="card skeleton tall" />
+      ) : stats.length === 0 ? (
+        <div className="empty"><p>No rows yet -- add notes, then wait for the next pool (or they merge into row-list reads immediately).</p></div>
+      ) : (
+        <div className="card">
+          <table className="stats-table">
+            <thead><tr><th>Author</th><th>Notes</th><th className="col-bar"></th><th>Latest</th></tr></thead>
+            <tbody>
+              {stats.map((s) => {
+                const { initial, hue } = avatar(s.authorName);
+                return (
+                  <tr key={s.authorName}>
+                    <td>
+                      <span className="chip sm" style={{ background: `hsl(${hue} 45% 28%)`, color: `hsl(${hue} 80% 82%)` }}>{initial}</span>
+                      {s.authorName}
+                    </td>
+                    <td className="num">{s.notes}</td>
+                    <td className="col-bar"><span className="bar" style={{ width: `${(s.notes / max) * 100}%` }} /></td>
+                    <td className="dim">{s.latest ? relTime(s.latest) : "-"}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
   );
 }
