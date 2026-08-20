@@ -1194,3 +1194,42 @@ COMPLETE as a BYPRODUCT of writing minimal tests. Tandem rule: when codex or I h
 something, FIRST question = "which layer owns this?" -> it goes there, WITH a caller, never
 copy-pasted. This is why the whole effort compounds: each pattern proven leaves the SDK +
 the harness both richer for the next agent.
+
+## PHASE 1 ARCHITECTURE RESOLVED (operator) -- probe bolts in raindb-test-lightning-{goja,pod}
+
+The bolt-sdk host bindings (ctx.db/sql/files/iam/response) ONLY run inside a deployed bolt,
+so the live contract for a bolt-sdk primitive = a PROBE in a deployed probe bolt. Those
+already exist:
+- ~/src/raindb-test-lightning-goja (goja engine = default, what the starter targets)
+- ~/src/raindb-test-lightning-pod  (pod engine; byte-identical shared/ via scripts/sync-shared.sh)
+Both import @raindb/bolt-sdk + @raindb/agent and are a STANDING regression suite: one probe
+per binding (shared/probes.js: {name, ns, kind:'read|write|compute|negative|poa|legacy',
+async run(s)} -> calls the wrapper, catches throws, reports {ok,bound,result,error,...}),
+exposed at GET /api/probes (+ /api/probe/:name, /api/probe-poa authenticated). Deploy+drive
+BOTH engines + emit the goja|pod|parity matrix via:  scripts/run-matrix.sh --profile <p>
+(idempotent: publishes formations, seeds, deploys both bolts, runs every probe). It already
+ships the formations I need: sdktest-notes (indexes+descIndex+SQL), sdktest-stream (steam+SQL),
+sdktest-quota (COUNTER TOKEN), sdktest-pairs (compound pointer), sdktest-property (entity-plural).
+
+=> PHASE 1 = ADD PROBES for the new primitives (three-layer discipline: capability in the SDK,
+the probe is THIN -- calls the wrapper + returns result, the matrix/live-contract asserts):
+- db.versionHistory (over sdktest-notes revisions)
+- sql.queryEntityRowsFresh (write -> BEHIND -> merged result includes the un-pooled tail; the
+  freshness two-plane, my new primitive)
+- files.reserveUpload/reserveDownload (revisions:true float -- needs a float formation; check if
+  one exists or add sdktest-file)
+- startSSE (a streaming route probe)
+- iam.mintActivitySubscription (derives chain-head keys + mints; sdktest-notes by-update descIndex)
+- draft-token writeDelay+autoCache coalescing (N mutate ops -> counter accumulates; sdktest-quota
+  already proves the counter -- extend for the coalescing/round-trip dimension)
+- the redis+ counter (mutateAndRead delta/total + windowed INCR) -- sdktest-quota exists; extend.
+EDIT ONLY THE GOJA REPO, then scripts/sync-shared.sh propagates to pod. deployment.json (engine)
+is per-repo, never synced. This is a 5th repo dependency I augment + idempotently deploy to
+vector-sandbox1. New formations added the RAINDB_PATTERNS-conformant way (deploy gotchas in the
+README: ops enums {read,write,list}/{get,put,delete}; tierPolicy needs trigger.next+path{{.poolId}}+
+source.index+catalog.location). Python live tier / chrome-devtools can also drive the probe endpoints.
+
+ALSO: the gosdk tier (Go live-SDK, ListCounter round-trip COUNT) proves platform-side S3 cost --
+use it for the draft-coalescing "N writes -> few S3 PUTs" COST contract that a probe (which sees
+values, not S3 PUT counts) cannot. So a primitive may get BOTH: a bolt probe (behavior on the real
+runtime) + a gosdk count contract (S3 cost). Both augment the harness for the next agent.
