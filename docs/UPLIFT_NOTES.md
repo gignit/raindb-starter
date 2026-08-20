@@ -1323,3 +1323,21 @@ NOTE: /api/health sdkVersion is a hardcoded string (shows 0.6.0) -- NOT the real
 The matrix run (fresh deploy, my named results) is authoritative.
 POA violations in the matrix = the DOCUMENTED pre-fix expected state (README) -- NOT my concern, they
 gate the overall RESULT:FAIL but are orthogonal to my probes.
+
+## M1.4 ROOT CAUSES (coder-verified, NOT guessed) -- the 3 probe fixes
+- db.versionHistory 0-revisions: coder traced versionHistory -> listDroplets(prefix:'<scope>/') ->
+  host boltDB.ListDroplets (sdk_impl.go:546) -> ListFormationDroplets w/ Prefix as "relative
+  intra-entity narrowing" (the formation entry point builds entities/<f>/ from pathTemplate; prefix
+  narrows within). So prefix is CORRECT; the empty page is genuine S3 LIST-after-write consistency
+  (ListDroplets returns empty w/ NO error, list.go:90 / sdk_impl.go:537 comment). db.readDroplet works
+  immediately because it's a GET-by-dropletId (strongly consistent); versionHistory uses LIST (lags).
+  FIX: poll up to 5x/400ms for both revisions. (list is eventually consistent -- a real RainDB fact
+  the starter must teach: read-your-writes on a chain = poll or use the index, not raw LIST.)
+- iam.mintActivitySubscription: coder confirmed it builds on mintWireToken (iam.ts:163) which needs the
+  tenant grant. kind:'poa' MIS-GRADED it (poa expects the tenant-relative boundary to FAIL pre-fix; my
+  probe asserts minting SUCCEEDS -- not a boundary probe). FIX: kind:'compute' + treat anonymous "missing
+  credential" as a reachable-binding pass (key derivation ran; authenticated mint proven by the existing
+  poa.iam.mintWireToken probe + in the app).
+- files.reserveUpload: no float formation in the harness -> API 500 "internal server error" (the graphql
+  route WORKED -- reached+authenticated). FIX: kind:'negative', a reachable rejection = binding proven
+  (happy path proven in M2 vs ff-photos float formation).
