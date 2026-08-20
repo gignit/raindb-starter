@@ -348,3 +348,51 @@ real-time + an auto-datalake + AI over your data FOR FREE, at any scale, no refa
 The AI workout report + charts get their power described as "RainDB's analytical
 engine runs full SQL over your entire history instantly" -- window functions for PR
 detection, trend lines, percentiles -- WITHOUT ever naming how.
+
+## CODEX REVIEW -- coder-validated corrections (peer review earned its keep)
+
+Codex flagged 4 real bugs; I re-verified the pivotal one myself in coder:
+
+1. [CRITICAL, CONFIRMED] flattenDepth does NOT flatten a FREE-FORM object.
+   processProperties (pkg/duckdb/schema_mapper.go:247) recurses ONLY when
+   prop.Properties != nil -- i.e. only SCHEMA-DECLARED nested properties flatten
+   to columns. A free-form `metrics` object (additionalProperties, no declared
+   properties) becomes ONE opaque JSON column (line 260), NOT metrics_weight.
+   => My "free-form metrics + flatten = charts" story was WRONG.
+   FIX (better design, coder-confirmed): declare the common numeric metrics as
+   FIRST-CLASS nullable schema properties on ref-workout-sets -- weightKg, reps,
+   distanceM, durationMs, avgHeartRateBpm, elevationM -- so they are REAL typed SQL
+   columns (chartable + window-functionable). KEEP a free-form `metrics` JSON for
+   user-defined EXTRAS (opaque to SQL, fine -- extras aren't charted). The
+   metricSchema (on the category) maps UI inputs + user units onto these canonical
+   fields. This preserves "define any data type" AND gives typed analytical SQL.
+
+2. Native db.writeDroplet takes only {formationId, payload} -- NO idempotencyKey
+   (sdk_impl.go:497). For per-set idempotency use db.writeBatch (single item, exposes
+   per-item idempotency) OR mint setId UUIDv7 client-side as set:<setId> retry identity.
+   (Candidate SDK gap: writeDroplet with opts. Adjudicate before building.)
+
+3. Immediate AI report canNOT be SQL-only (SQL trails rollup). Merge the fresh
+   by-update tail (freshness overlay, PATTERNS.md:141) OR inject the just-completed
+   session's fresh droplets into the report context, else the report omits the
+   workout just finished.
+
+4. by-category must be a SINGLE pointer .../{{.categoryId}}/latest.json (readLatest
+   takes exactly one scopeValue) so prefill works; its descIndex retains history
+   independently. A path mixing category+set ids can't support the prefill call.
+
+Codex's "killer SQL" list (full analytical engine, coder-confirmed SELECT/WITH +
+multi-formation joins): computed PR ledger (MAX OVER/LAG -> lifetime/90d/comeback PR),
+fitness-vs-fatigue (7d/28d RANGE acute:chronic load, monotony/strain), efficiency
+frontier (quantile_cont/percent_rank -- pace at equal HR, 1RM at equal bodyweight),
+plateau/milestone forecast (regr_slope/regr_r2 trend + projected date). The Benchmark
+button = "important test effort"; SQL decides if it was objectively a PR. (Describe
+all this by CAPABILITY -- never name the engine.)
+
+CATALOG vs DROPLET: codex says catalog (semantically right: tree/transfer/CAS) +
+snapshot metricSchema version onto each set. I found the entries-array is opaque to
+SQL. RESOLUTION: categories don't NEED to be SQL-joined if sets carry denormalized
+categoryId + categoryPath + canonical columns (which they now do). So EITHER works;
+lean catalog for the tree ergonomics IF the catalog bolt binding is filled (it's a
+stub -- route via ctx.fetch graphql, real op names: catalogScopeValue/entry/refValue).
+Await claude, then decide catalog-vs-droplet with the canonical-columns fix locked.
