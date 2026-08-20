@@ -1,145 +1,84 @@
+/* FitLedger -- mobile-first. Big touch targets for logging mid-workout on a
+   phone; a bottom tab bar; dark theme. Scales up to desktop with a max-width. */
 :root {
   color-scheme: dark;
   --bg: #0d1117;
-  --panel: #161b22;
-  --border: #30363d;
-  --text: #e6edf3;
+  --card: #161b22;
+  --line: #26303c;
+  --fg: #e6edf3;
   --muted: #8b949e;
-  --accent: #58a6ff;
-  --error: #f85149;
+  --accent: #2f81f7;
+  --accent2: #238636;
+  --danger: #f85149;
+  --radius: 14px;
 }
-
 * { box-sizing: border-box; }
-
+html, body, #root { height: 100%; margin: 0; }
 body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background: var(--bg); color: var(--fg);
+  font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
+.center { display: grid; place-items: center; height: 100%; }
+.muted { color: var(--muted); }
+.error { background: #3d1418; color: #ffb4ac; padding: 10px 12px; border-radius: 10px; margin: 8px 0; }
+.ok { color: #7ee787; margin-top: 8px; }
+h2 { font-size: 1.15rem; margin: 16px 0 8px; }
 
-.shell { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+/* ---- app shell ---- */
+.app { display: flex; flex-direction: column; min-height: 100%; max-width: 640px; margin: 0 auto; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 16px; border-bottom: 1px solid var(--line); position: sticky; top: 0; background: var(--bg); z-index: 5; }
+.brand { font-weight: 800; letter-spacing: -0.02em; font-size: 1.2rem; }
+.brand.big { font-size: 2rem; text-align: center; margin-top: 12vh; }
+.content { flex: 1; padding: 12px 16px 90px; }
+.tabbar { position: fixed; bottom: 0; left: 0; right: 0; max-width: 640px; margin: 0 auto; display: flex; border-top: 1px solid var(--line); background: var(--card); }
+.tab { flex: 1; padding: 14px; background: none; border: none; color: var(--muted); font-size: 0.95rem; font-weight: 600; }
+.tab.active { color: var(--accent); }
 
-.header h1 { margin: 0 0 4px; font-size: 1.6rem; }
-.header p { margin: 0 0 24px; color: var(--muted); max-width: 70ch; }
-.header code { color: var(--accent); }
+/* ---- odometer ---- */
+.odometer { display: flex; gap: 14px; flex-wrap: wrap; padding: 10px 16px; font-size: 0.85rem; color: var(--muted); border-bottom: 1px solid var(--line); }
+.odometer b { color: var(--fg); }
 
-.columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 800px) { .columns { grid-template-columns: 1fr; } }
+/* ---- auth ---- */
+.authpage { max-width: 380px; margin: 0 auto; padding: 24px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
 
-.panel {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  min-height: 480px;
-}
-.panel h2 { margin: 0 0 12px; font-size: 1.1rem; }
+/* ---- inputs + buttons (big, touch-friendly) ---- */
+input, textarea { width: 100%; padding: 14px; font-size: 16px; background: #0b0f14; border: 1px solid var(--line); border-radius: 10px; color: var(--fg); }
+textarea { resize: vertical; }
+.titleinput { font-size: 1.2rem; font-weight: 700; margin: 8px 0; }
+.btn { padding: 14px 18px; font-size: 1rem; font-weight: 700; border: 1px solid var(--line); background: var(--card); color: var(--fg); border-radius: 12px; cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: white; }
+.btn.big { width: 100%; padding: 18px; font-size: 1.1rem; margin-top: 12px; }
+.link { background: none; border: none; color: var(--accent); cursor: pointer; padding: 8px 0; font-size: 0.95rem; }
+.infobtn { width: 20px; height: 20px; border-radius: 50%; border: 1px solid var(--muted); color: var(--muted); background: none; font-size: 0.75rem; margin-left: 6px; cursor: pointer; }
+.checkline { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+.checkline input { width: auto; }
 
-input, textarea, button {
-  font: inherit;
-  color: var(--text);
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 8px 10px;
-}
-button {
-  background: var(--accent);
-  color: #04111f;
-  border: none;
-  cursor: pointer;
-  font-weight: 600;
-}
-button:disabled { opacity: 0.5; cursor: default; }
+/* ---- workout grid + logging ---- */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.bigcard { padding: 28px 16px; font-size: 1.15rem; font-weight: 700; background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); cursor: pointer; text-align: center; }
+.bigcard.dashed { border-style: dashed; color: var(--muted); font-weight: 600; }
+.logform { display: flex; flex-direction: column; gap: 12px; margin-top: 12px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field span { font-size: 0.85rem; color: var(--muted); }
+.field input { font-size: 1.4rem; text-align: center; padding: 18px; }
 
-.note-form { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
+/* ---- lists ---- */
+.list { list-style: none; padding: 0; margin: 8px 0; }
+.list.small .listitem { padding: 10px 0; }
+.listitem { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 14px; border-bottom: 1px solid var(--line); cursor: pointer; }
+.listitem .title { font-weight: 600; }
+.rowbetween { display: flex; align-items: center; justify-content: space-between; }
+.tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.tag { font-size: 0.75rem; color: var(--accent); background: #10233f; padding: 2px 8px; border-radius: 999px; }
 
-.notes { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
-.note { border-top: 1px solid var(--border); padding: 10px 2px; }
-.note-head { display: flex; justify-content: space-between; gap: 8px; }
-.note p { margin: 6px 0; white-space: pre-wrap; }
-.note-body { margin: 6px 0; }
-.meta { color: var(--muted); font-size: 0.85rem; }
-.error { color: var(--error); }
+/* ---- journal editor ---- */
+.bodyinput { min-height: 200px; margin: 8px 0; }
+.infobox { background: #10233f; border: 1px solid #1d3a5f; border-radius: 10px; padding: 12px; font-size: 0.85rem; margin: 8px 0; color: #b8d4f5; }
+.history { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 8px; }
 
-.chat-log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
-.chat-line { padding: 8px 12px; border-radius: 8px; max-width: 90%; white-space: pre-wrap; }
-.chat-line.user { background: #1f3a5f; align-self: flex-end; }
-.chat-line.assistant { background: #21262d; align-self: flex-start; white-space: normal; }
-
-/* github-markdown-css integration: the .markdown-body class (on note
-   bodies + assistant replies) gets GitHub's full markdown styling from
-   the package. Only override what must match our panels. */
-.markdown-body {
-  background: transparent;
-  font-size: 0.95rem;
-}
-.chat-line.activity { color: var(--muted); font-size: 0.85rem; padding: 0 4px; }
-.chat-line.error { color: var(--error); font-size: 0.9rem; }
-
-.chat-form { display: flex; gap: 8px; }
-.chat-form input { flex: 1; }
-
-/* ---- Pod certification banner ---- */
-.pod-cert {
-  margin: 0 0 16px;
-  padding: 12px 16px;
-  border-radius: 8px;
-  border: 1px solid #2a2f3a;
-  background: #161a22;
-}
-.pod-cert.certified { border-color: #2ea043; background: #111a12; }
-.pod-cert-head { display: flex; align-items: center; gap: 12px; }
-.pod-cert-badge {
-  font-size: 12px; font-weight: 700; letter-spacing: 0.04em;
-  padding: 2px 8px; border-radius: 999px; background: #30363d; color: #c9d1d9;
-}
-.pod-cert.certified .pod-cert-badge { background: #2ea043; color: #fff; }
-.pod-cert-refresh {
-  margin-left: auto; font-size: 12px; padding: 3px 10px; cursor: pointer;
-  background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px;
-}
-.pod-cert-grid {
-  list-style: none; margin: 10px 0 0; padding: 0;
-  display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: 13px; color: #adbac7;
-}
-.pod-cert-grid li { display: flex; align-items: center; gap: 6px; }
-.pod-cert-grid .d { width: 9px; height: 9px; border-radius: 50%; background: #6e7681; }
-.pod-cert-grid .d.ok { background: #2ea043; }
-.pod-cert-grid .d.bad { background: #f85149; }
-.pod-cert-grid .d.unknown { background: #d29922; }
-
-/* ---- Collapsible agent "thinking" trace ---- */
-.chat-line .thinking {
-  margin: 0 0 8px;
-  border: 1px solid #2a2f3a;
-  border-radius: 6px;
-  background: #11151c;
-  font-size: 12px;
-}
-.chat-line .thinking > summary {
-  cursor: pointer;
-  padding: 5px 10px;
-  color: #8b98a5;
-  list-style: none;
-  user-select: none;
-}
-.chat-line .thinking > summary::-webkit-details-marker { display: none; }
-.chat-line .thinking > summary::before {
-  content: "\25B6";
-  display: inline-block;
-  margin-right: 7px;
-  font-size: 9px;
-  transition: transform 0.15s ease;
-}
-.chat-line .thinking[open] > summary::before { transform: rotate(90deg); }
-.chat-line .thinking[open] > summary { color: #adbac7; border-bottom: 1px solid #2a2f3a; }
-.thinking-steps {
-  margin: 0;
-  padding: 6px 10px 8px 26px;
-  color: #8b98a5;
-}
-.thinking-steps li { margin: 2px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+/* ---- progress ---- */
+.streak { font-size: 1.1rem; font-weight: 700; padding: 10px 0; }
+.badge { font-size: 0.7rem; background: #3a2f10; color: #f5d472; padding: 3px 8px; border-radius: 999px; }
+.report { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; margin-top: 12px; white-space: pre-wrap; }
