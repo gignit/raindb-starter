@@ -1412,3 +1412,25 @@ KEY DEPLOY FACTS (for M5 setup.sh + deploy.sh fix):
   needs updating in M5 to the reference/ paths + --from-secrets on first deploy.
 - .fitledger-secrets.json is gitignored (real values). Secrets now staged; drop --from-secrets on
   redeploys unless values change.
+
+## M6b CHROME-DEVTOOLS E2E -- CORE VALIDATED LIVE (vector-sandbox1)
+Drove the real deployed app end-to-end. PROVEN working:
+- AUTH: register + login (revocable ref-session token, JWT + HttpOnly cookie). requireUser gates all.
+- WORKOUT: start session (200), seed 4 exercises (Bench/Squat/Deadlift/Run), log a benchmark set
+  (80kg x5, 200), two-axis "last set" prefill (200), community odometer incremented live (0->1 workouts).
+- JOURNAL zero-knowledge encryption: created an encrypted entry; NETWORK TAB CONFIRMED the request body
+  carried CIPHERTEXT ("+9t7FjL...") not plaintext -- the server literally never saw the plaintext -- while
+  tags stayed plaintext ["gratitude","private"]. (i) explainer renders correctly. List renders the entry.
+5 REAL RUNTIME BUGS found+fixed (only surfaced on the live platform, not static compile):
+  1. session scopeValue (goja host writeToken returns only dropletId) -> mint sessionId client-side.
+  2. categoryPath null -> default to name.
+  3. counter cold-miss (mutate needs the token to exist) -> ensureCounter() seeds first.
+  4. by-parent + by-author LIST empty (natural-string path segments hash-encoded: 'root'->'cm9vdA~b64',
+     'Test Athlete'->'VGVzdCBBdGhsZXRl~b64') -> prefix only on raw/UUID segments + filter from payloads.
+     (A genuine RainDB lesson the starter now teaches.)
+  5. 'encrypted' field missing from ref-entries schema -> added, republished v2.
+REMAINING e2e (valuable, not blocking -- core proven): decrypt read-back on a fresh entry, version
+history/restore, AI report (needs LLM creds valid), mobile viewport responsive check.
+PLATFORM GAPS LOGGED (file upstream): (a) ctx.db.writeToken should return the full envelope
+(scopeValue), like writeDroplet -- goja host returns only dropletId. (b) deploy 500s (not 400) when
+capabilities' expected secrets aren't staged.
