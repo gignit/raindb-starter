@@ -292,3 +292,29 @@ FILL (thin, bounded):
 The wakeup is a SIGNAL ("key X changed"), not a COUNT -- unread count is app state
 the client derives. Ledger feed uses it: new entry -> alert + unread badge when
 the feed isn't focused.
+
+## WORKOUT PILLAR -- design review (my coder-grounded verdict, pre-peer)
+
+Question A (catalog vs droplet for the category tree) -- I independently verified
+with coder, and it FLIPS my doc-first instinct:
+- CatalogConfig (pkg/formation/catalog.go): entries are an ARRAY FIELD inside ONE
+  scoped droplet's payload (EntriesField). A catalog is one droplet holding the
+  whole collection, addressed by refKey, with CAS-safe insert/delete/transfer/tree.
+- SchemaMapper.MapColumns (pkg/duckdb/schema_mapper.go) flattens schema PROPERTIES
+  to SQL columns per flattenDepth. An OBJECT flattens to metrics_weight/metrics_reps
+  (chartable). An ARRAY maps to ONE opaque JSON/list column -- so a catalog's entries
+  are NOT per-row SQL-queryable.
+- VERDICT: categories should be a DROPLET formation (ref-workout-categories) with a
+  by-parent descIndex, NOT a catalog -- because I want to JOIN categories to sets in
+  periscope SQL for cross-category analytics (volume by category, PRs by exercise),
+  which needs categories as ROWS. Catalog is right for an OPAQUE managed collection
+  (a folder's file list); here categories are first-class analytical entities.
+  The metricSchema still rides on each category droplet's payload (config-as-data).
+- This is a case where the obvious doc primitive (catalog) is NOT the best fit --
+  exactly what coder + peer review should catch. Await codex/claude to confirm/refute.
+
+periscope = FULL DuckDB/Iceberg over S3 parquet (operator). So the workout SQL can
+use window functions + CTEs + percentiles: rolling-max PR detection, Epley 1RM trend
+(weight*(1+reps/30)), weekly volume=sum(weight*reps), pace/HR percentiles, PR streaks,
+deload detection. The AI report runs these -- "REAL SQL" is the wow. flattenDepth:2 on
+ref-workout-sets makes metrics.* chart columns.
