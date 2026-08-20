@@ -318,3 +318,33 @@ use window functions + CTEs + percentiles: rolling-max PR detection, Epley 1RM t
 (weight*(1+reps/30)), weekly volume=sum(weight*reps), pace/HR percentiles, PR streaks,
 deload detection. The AI report runs these -- "REAL SQL" is the wow. flattenDepth:2 on
 ref-workout-sets makes metrics.* chart columns.
+
+## PROPRIETARY BOUNDARY + THE REAL THESIS (operator -- governs the WHOLE starter)
+
+NEVER name the engines in ANY tenant-facing surface (README, AGENTS.md, client UI,
+code comments the tenant reads, AI report text): NO "DuckDB", "Iceberg", "parquet",
+"S3", "SQS", "Textract", "EC2". Describe periscope SQL by its CAPABILITIES using
+RainDB's own vocabulary (verified against the tenant docs):
+- "Periscope is RainDB's auto-datalake."
+- "your operational data automatically becomes ONE queryable, infinitely-scalable
+  analytical SQL table, materialized from your completed droplets -- no ETL, no
+  separate warehouse."
+- capabilities to claim: full analytical SQL -- joins, grouping, aggregation,
+  window functions, CTEs, time-series, percentiles, broad scans, reporting.
+
+THE THESIS the starter must convey (coder-verified in pkg/formation/tier_policy.go):
+RainDB is an infinitely-scalable, multi-tenant SaaS platform where the SAME code +
+data model powers a personal site OR a Twitter/Instagram-scale site with ZERO
+refactor. Mechanism: droplets AUTO-CASCADE from the write path up a tier cascade
+(stream ~5m -> river ~hourly -> lake) into the datalake; partitioning is declarative
+(scopeHash prefixLength 2=256 partitions, 4=65536) so the same tierPolicy scales by
+fan-out, not a rewrite. The platform even solves the PUT-vs-LIST consistency race
+(ScopeReduction) so the author never sees it. "More than meets the eye -- not a toy."
+
+STARTER PURPOSE (sharpened): ground an agent that RainDB is a serious, infinitely
+scalable platform. The Ledger + Workouts show: write simple droplets, get history +
+real-time + an auto-datalake + AI over your data FOR FREE, at any scale, no refactor.
+
+The AI workout report + charts get their power described as "RainDB's analytical
+engine runs full SQL over your entire history instantly" -- window functions for PR
+detection, trend lines, percentiles -- WITHOUT ever naming how.
