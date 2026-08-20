@@ -39,7 +39,7 @@ export async function onHttpRequest(ctx: BoltContext, req: BoltRequest): Promise
 
   try {
     // ---- streaming AI (SSE) first ----
-    if (path === "/api/ai/chat" && method === "POST") return await handleChat(req);
+    if (path === "/api/ai/chat" && method === "POST") return await handleChat(ctx, req);
 
     // ---- auth ----
     if (path === "/api/auth/register" && method === "POST") return await handleRegister(req);
