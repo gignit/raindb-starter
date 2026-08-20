@@ -14,6 +14,8 @@ import {
   listAllNoteIds,
   listNoteIdsByAuthor,
   readNotes,
+  statsByAuthor,
+  recentNotesFresh,
 } from "../lib/persistence.js";
 
 /** GET /api/notes[?author=x] -- list notes (newest first; UUIDv7 sorts). */
@@ -45,6 +47,27 @@ export async function handleGetNote(req: BoltRequest): Promise<BoltResponse> {
   const note = await readNote(noteId);
   if (!note) return notFound("note " + noteId + " not found");
   return ok({ note });
+}
+
+/**
+ * GET /api/stats -- AXIS 2: analytical SQL (count notes by author) over the
+ * SAME droplets, plus the freshness verdict. The response's `freshness.behind`
+ * drives the client's "updating..." badge -- the honest way to present an
+ * eventually-consistent aggregate.
+ */
+export async function handleStats(_req: BoltRequest): Promise<BoltResponse> {
+  const { stats, freshness } = await statsByAuthor();
+  return ok({ stats, freshness });
+}
+
+/**
+ * GET /api/notes-sql -- recent notes as a SQL row list with the fresh tail
+ * MERGED in (read-your-writes over the analytical plane). Contrast /api/notes
+ * (pure index reads): this shows the merge pattern for a list.
+ */
+export async function handleRecentNotesSql(_req: BoltRequest): Promise<BoltResponse> {
+  const notes = await recentNotesFresh(20);
+  return ok({ notes });
 }
 
 /** POST /api/notes/:id {title?, body?, tags?} -- update (new revision). */

@@ -45,6 +45,33 @@ export async function createNote(fields: {
   return data.note;
 }
 
+// ---- Analytics (AXIS 2: Periscope SQL over the same droplets) ----------
+//
+// /api/stats runs a GROUP BY over the note droplets and returns a freshness
+// verdict; /api/notes-sql returns a SQL row list with the fresh tail merged in.
+// The freshness flag is what powers the "updating..." badge -- the honest way
+// to show an eventually-consistent aggregate.
+
+export interface Freshness {
+  status: string; // CURRENT | BEHIND | UNKNOWN | UNAVAILABLE
+  behind: boolean;
+}
+
+export interface AuthorStat {
+  authorName: string;
+  notes: number;
+  latest: string | null;
+}
+
+export async function getStats(): Promise<{ stats: AuthorStat[]; freshness: Freshness }> {
+  return json(await fetch("/api/stats"));
+}
+
+export async function listNotesSql(): Promise<Note[]> {
+  const data = await json<{ notes: Note[] }>(await fetch("/api/notes-sql"));
+  return data.notes;
+}
+
 // ---- SSE chat ----------------------------------------------------------
 //
 // POST /api/chat streams the agent loop's progress as SSE frames. We use

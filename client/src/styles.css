@@ -167,3 +167,19 @@ button:disabled { opacity: 0.5; cursor: default; }
   max-height: 8em;
   overflow: auto;
 }
+
+/* ---- Analytics (SQL) panel ---- */
+.analytics { margin-top: 16px; }
+.analytics-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.analytics-head h2 { margin: 0; }
+.freshness { font-size: 12px; padding: 3px 10px; border-radius: 999px; font-weight: 600; }
+.freshness.current { background: #10251a; color: #6bc46d; border: 1px solid #1d4c2f; }
+.freshness.behind { background: #2a2410; color: #d9b23a; border: 1px solid #4c421d; }
+.analytics-head .refresh {
+  margin-left: auto; font-size: 12px; padding: 4px 10px; border-radius: 6px;
+  background: #21262d; color: #adbac7; border: 1px solid #2a2f3a; cursor: pointer;
+}
+.analytics .meta code { font-size: 11px; color: #8b98a5; }
+.stats-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 14px; }
+.stats-table th, .stats-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid #21262d; }
+.stats-table th { color: #8b98a5; font-weight: 600; font-size: 12px; }

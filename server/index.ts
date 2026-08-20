@@ -19,6 +19,8 @@ import {
   handleCreateNote,
   handleGetNote,
   handleUpdateNote,
+  handleStats,
+  handleRecentNotesSql,
 } from "./routes/notes.js";
 
 export async function onHttpRequest(
@@ -42,7 +44,12 @@ export async function onHttpRequest(
       return await handleChat(ctx, req);
     }
 
-    // CRUD routes -- @raindb/bolt-sdk db.* bindings.
+    // Analytical SQL routes -- Periscope over the SAME droplets (AXIS 2).
+    // (Checked before the /api/notes/* prefix so they don't get shadowed.)
+    if (method === "GET" && path === "/api/stats") return await handleStats(req);
+    if (method === "GET" && path === "/api/notes-sql") return await handleRecentNotesSql(req);
+
+    // CRUD routes -- @raindb/bolt-sdk db.* bindings (AXIS 1: index reads).
     if (method === "GET" && path === "/api/notes") return await handleListNotes(req);
     if (method === "POST" && path === "/api/notes") return await handleCreateNote(req);
     if (method === "GET" && path.startsWith("/api/notes/")) return await handleGetNote(req);

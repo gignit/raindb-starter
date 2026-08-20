@@ -19,7 +19,10 @@ import "github-markdown-css/github-markdown-dark.css";
 function Md({ children }: { children: string }) {
   return <Markdown remarkPlugins={[remarkGfm]}>{children}</Markdown>;
 }
-import { listNotes, createNote, streamChat, type Note, type ChatEvent } from "./api";
+import {
+  listNotes, createNote, streamChat, getStats, type Note, type ChatEvent,
+  type AuthorStat, type Freshness,
+} from "./api";
 
 export default function App() {
   return (
@@ -28,15 +31,91 @@ export default function App() {
         <h1>RainDB Starter</h1>
         <p>
           Notes live as immutable droplets in the <code>starter-notes</code> formation.
-          The assistant reads them through an agent tool. No database server, no ORM,
-          no migrations -- the substrate is the backend.
+          Read them two ways: an <strong>index</strong> lookup (instant, any scale) or
+          <strong> analytical SQL</strong> over the same data. The assistant reads them
+          through an agent tool. No database server, no ORM, no migrations.
         </p>
       </header>
       <main className="columns">
         <NotesPanel />
         <ChatPanel />
       </main>
+      <AnalyticsPanel />
     </div>
+  );
+}
+
+// ---- Analytics (AXIS 2: Periscope SQL + freshness) ---------------------
+//
+// The SAME note droplets are queryable as an analytical SQL table. This panel
+// runs a GROUP BY (count by author) and shows a FRESHNESS badge: the SQL plane
+// is eventually consistent (it pools every ~5 min), so right after you add
+// notes it may be "updating..." while the index-based Notes list already shows
+// them. That contrast IS the lesson -- index for read-your-writes, SQL for
+// analytics, freshness badge for the gap.
+
+function AnalyticsPanel() {
+  const [stats, setStats] = useState<AuthorStat[]>([]);
+  const [freshness, setFreshness] = useState<Freshness | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await getStats();
+      setStats(r.stats);
+      setFreshness(r.freshness);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return (
+    <section className="panel analytics">
+      <div className="analytics-head">
+        <h2>Analytics (SQL)</h2>
+        {freshness && (
+          <span className={`freshness ${freshness.behind ? "behind" : "current"}`}>
+            {freshness.behind
+              ? "updating... (new notes pool into SQL every ~5 min)"
+              : "up to date"}
+          </span>
+        )}
+        <button className="refresh" onClick={() => void reload()} disabled={loading}>
+          {loading ? "..." : "refresh"}
+        </button>
+      </div>
+      <p className="meta">
+        <code>SELECT authorName, COUNT(*) FROM entity."starter-notes" GROUP BY authorName</code>
+        {" "}-- analytical SQL over the same droplets, no ETL.
+      </p>
+      {error && <p className="error">{error}</p>}
+      <table className="stats-table">
+        <thead>
+          <tr><th>Author</th><th>Notes</th><th>Latest</th></tr>
+        </thead>
+        <tbody>
+          {stats.map((s) => (
+            <tr key={s.authorName}>
+              <td>{s.authorName}</td>
+              <td>{s.notes}</td>
+              <td>{s.latest ? new Date(s.latest).toLocaleString() : "-"}</td>
+            </tr>
+          ))}
+          {stats.length === 0 && !error && (
+            <tr><td colSpan={3} className="meta">no rows yet -- add notes, then wait for the next pool</td></tr>
+          )}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
