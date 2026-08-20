@@ -964,3 +964,55 @@ encodes: after a workout the chart (history_sql) is BEHIND -> "updating, ~Nm" wh
 just-logged set is instant via the index (session_fresh), so nothing feels lost while the
 chart catches up. The bookmark (snapshot vs current dropletId + indexPrefix) is precisely
 what queryEntityRowsFresh harvests for a ROW-LIST, and what the badge reads for a CHART.
+
+## THE REDIS PATTERN -- verified in git + MCP + raw S3 (the 4th pillar of the collapse)
+
+Read the git commits (full bodies, no truncation) + inspected the live formations via MCP +
+pulled the RAW objects from prod S3 (describe masks platform-controlled internals). The
+"redis better than redis" pattern, confirmed at every level:
+
+GIT (operator's own words):
+- eceda895 "counter-token as Redis replacement": 100 Mutate(+1) -> counter=100 with ONE S3
+  PutObject (writeDelay throttles flush) = "the Redis-INCR-with-controlled-persistence
+  pattern". JSONOpMove folds delta->total + zeroes delta = "Redis EXPIRE equivalent".
+- 8ce3e842 MutateAndRead = "the INCR-returns-value primitive"; owner applies+reads under
+  entry mutex (atomic INCR), non-owner = "one wire hop = the Redis hop".
+- 65c064b8 JSONOpWindowIncrement = "the Redis INCR+EXPIRE pattern as ONE atomic op" under
+  the owner mutex = "the Redis-node equivalent".
+- 680a18b1 fleet-wide rate limiter "copying the Redis INCR+EXPIRE rate-limit pattern onto
+  the shared tenant-meter token"; ONE limiter (PROJECT_REQUIREMENTS rule 2), fail-OPEN.
+- 4e39c41e "the redis+ pattern" -- fleet query-concurrency LEASE (semaphore) on the SAME meter
+  token, alongside storage + rate-limit counters. "Counters live on the ONE per-tenant meter
+  token (unified-token design)."
+
+MCP describe (tenant-meter): formationType:token, lifecycle.autoCache:true, cacheTTL:120s,
+writeDelay:120s (throttled flush), wireOpDelayMs:500; stats.fields storageBytesWritten/
+objectsWritten/requests/complexity/cacheBytes/memoryBytes (increment, keepRunningTotals);
+schema.counters additionalProperties:true (the free-form counter bag); queryConfig disabled
+(hot KV, not analytical); path tokens/tenant-meter/{{.tenantMeterId}}.json.
+
+RAW S3 (what describe/token-read masked):
+- tenant-meter token lives HASH-SHARDED: tokens/tenant-meter/1/9/d/0/<id>.json (pathInputHash
+  fan-out spreads a HOT counter token across S3 key-space to avoid a hotspot -- the SCALE
+  mechanism describe hides). Payload: counters.{delta,total,mergeTs} + __concurrency.priorETag
+  (CAS guard). Live: 412,863 objects / 1.23GB metered on ONE token.
+- iam-token = "redis for IAM keys" LIVE: each API key is a token at
+  tokens/iam-token/<4-level-hash-shard>/akid_<uuid>.json. Payload: jti, encrypted token,
+  resources/ops/role grant, expiresAt, revoked, audit.mintedBy, __concurrency.priorETag.
+  This IS Redis's #1 use case (auth/session/API-key store, O(1) by key, sharded, cached) --
+  as a durable RainDB token, NO Redis. author "apikey.service".
+Other redis-pattern token formations present: tenant-balance, lightning-bolt-stats.
+
+THE GENIUS (4th pillar of the stack-collapse): RainDB's wire-mesh object cache with
+owner-host mutexes + atomic JSON-ops IS a distributed in-memory KV -- so Redis is a SPECIAL
+CASE of a primitive already there. And BETTER: (a) UNIFIED -- storage metering + rate-limit
+window + concurrency lease all on ONE meter token (Redis = separate keys/system); (b) DURABLE
+-- persists to the platform's own substrate, no cache-vs-truth skew; (c) MULTI-TENANT +
+hash-sharded for hot-key scale for free; (d) inherits fail-open + CAS + one-limiter discipline.
+
+STARTER HINT (restraint -- don't name Redis or explain all this): the workout like/follower
+counts + "set N of session" already USE this (token mutateAndRead) -- so the starter
+DEMONSTRATES real-time fleet-authoritative counters with no broker/cache/second system,
+described as "RainDB tokens give you instant atomic counters + live stats, no extra
+infrastructure." One AGENTS "when you need X" row can point at the counter/token pattern.
+The full redis-replacement story belongs to a sibling example (raindb-redis), not the starter.
