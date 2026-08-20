@@ -123,7 +123,27 @@ textarea { resize: vertical; }
 .composer-row { display: grid; grid-template-columns: 160px 1fr; gap: 10px; }
 .composer-title { font-size: 1.05rem; font-weight: 600; }
 .composer-foot { display: flex; gap: 10px; align-items: center; }
-.composer-tags { flex: 1; }
+
+/* YouTube-style tag input: pills + a borderless draft field in one box. */
+.taginput {
+  flex: 1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
+  min-height: 40px; padding: 5px 8px; cursor: text;
+  background: var(--bg-2); border: 1px solid var(--line); border-radius: var(--radius-sm);
+  transition: border-color .12s, box-shadow .12s;
+}
+.taginput:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(76,141,255,.15); }
+.tag.pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 6px 3px 9px; }
+.tag-x {
+  border: none; background: rgba(255,255,255,.12); color: inherit;
+  width: 15px; height: 15px; line-height: 1; border-radius: 50%;
+  font-size: 10px; cursor: pointer; display: grid; place-items: center; padding: 0;
+}
+.tag-x:hover { background: rgba(255,255,255,.28); }
+.tag-draft {
+  flex: 1; min-width: 120px; width: auto; border: none; background: transparent;
+  padding: 4px 2px; box-shadow: none;
+}
+.tag-draft:focus { outline: none; box-shadow: none; border: none; }
 
 /* ---------- banners / empty / skeleton ---------- */
 .banner { padding: 10px 12px; border-radius: var(--radius-sm); font-size: .88rem; margin: 8px 0; }

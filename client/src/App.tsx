@@ -152,11 +152,56 @@ function NotesView() {
   );
 }
 
+// TagInput -- YouTube-style tag entry: type + press comma or Enter to commit a
+// pill, each pill has an (x) to remove, Backspace on an empty input pops the
+// last pill. Value is the string[] of tags (the shape createNote wants).
+function TagInput({ tags, onChange }: { tags: string[]; onChange: (t: string[]) => void }) {
+  const [draft, setDraft] = useState("");
+
+  const add = (raw: string) => {
+    // Allow pasting/typing several comma-separated tags at once.
+    const parts = raw.split(",").map((t) => t.trim().toLowerCase()).filter(Boolean);
+    if (parts.length === 0) return;
+    const next = [...tags];
+    for (const p of parts) if (!next.includes(p)) next.push(p);
+    onChange(next);
+    setDraft("");
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "," || e.key === "Enter") {
+      e.preventDefault();
+      add(draft);
+    } else if (e.key === "Backspace" && draft === "" && tags.length > 0) {
+      onChange(tags.slice(0, -1));
+    }
+  };
+
+  return (
+    <div className="taginput" onClick={(e) => (e.currentTarget.querySelector("input") as HTMLInputElement)?.focus()}>
+      {tags.map((t) => (
+        <span key={t} className="tag pill">
+          #{t}
+          <button type="button" className="tag-x" aria-label={`remove ${t}`} onClick={() => onChange(tags.filter((x) => x !== t))}>x</button>
+        </span>
+      ))}
+      <input
+        className="tag-draft"
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={onKeyDown}
+        onBlur={() => add(draft)}
+        placeholder={tags.length === 0 ? "add tags (comma or enter)" : ""}
+      />
+    </div>
+  );
+}
+
 function Composer({ onCreated }: { onCreated: () => void }) {
   const [author, setAuthor] = useState(() => localStorage.getItem("author") || "me");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [tags, setTags] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -165,8 +210,7 @@ function Composer({ onCreated }: { onCreated: () => void }) {
     if (!title.trim() || !author.trim()) return;
     setBusy(true);
     try {
-      const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
-      await createNote({ author: author.trim(), title: title.trim(), body, tags: tagList });
+      await createNote({ author: author.trim(), title: title.trim(), body, tags });
       localStorage.setItem("author", author.trim());
       onCreated();
     } catch (err) {
@@ -184,7 +228,7 @@ function Composer({ onCreated }: { onCreated: () => void }) {
       </div>
       <textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder="Write something... (markdown supported)" rows={4} />
       <div className="composer-foot">
-        <input className="composer-tags" value={tags} onChange={(e) => setTags(e.target.value)} placeholder="tags, comma, separated" />
+        <TagInput tags={tags} onChange={setTags} />
         <button className="btn primary" disabled={busy || !title.trim()}>{busy ? "Saving..." : "Save note"}</button>
       </div>
       {error && <div className="banner error">{error}</div>}
