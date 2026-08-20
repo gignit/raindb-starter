@@ -887,3 +887,50 @@ state + compose session_fresh for today. (c) NEW small client primitive: a "fres
 component driven by periscope_status (behind + dropletsAhead + next-pool ETA from the stream
 cron) -- reusable, and itself a teaching artifact. (d) A client util to compute the ETA from
 the stream trigger cron. Describe by capability; never name the engine.
+
+## LIVE FRESHNESS LIFECYCLE -- CAPTURED (drove it myself on vector-sandbox1)
+
+Wrote one droplet to sdktest-notes (stream-only, 5-min cadence) and watched the status flip.
+The EXACT signal the freshness-badge component consumes, observed end-to-end:
+
+BEFORE the write: sdktest-notes stream OK, behind:false, dropletsAhead:0,
+  snapshotCursor == currentCursor (01a00455-...). Badge: SILENT (caught up).
+
+WROTE: droplet_create sdktest-notes -> dropletId 01a01d9d-7f78-78e2-a4a4-092d3cb221f0
+  (also a nice real example: a harmless write WARNING "index by-author render: map has no
+  entry for key authorId" -- the by-author index template needs authorId I didn't supply;
+  the write STILL SUCCEEDED. Index-template-field mismatch = a warning, not a failure. Good
+  gotcha to teach: supply every field an index template references, or the index entry is
+  skipped with a warning.)
+
+AFTER the write (immediately): sdktest-notes
+  "state":"STALE", "behind":true, "dropletsAhead":1, "inflight":true,
+  "snapshotCursor":"01a00455-..."   <- what SQL currently sees (pooled)
+  "currentCursor":"01a01d9d-7f78-..." <- MY just-written droplet
+The currentCursor is EXACTLY my new dropletId; dropletsAhead:1 = my one droplet; inflight:true
+= the pool is already running. Meanwhile the note is INSTANTLY readable via the fresh by-update
+index (Axis 1) while SQL won't include it until the next ~5-min pool. Two-plane split, live.
+
+THE FULL BADGE SPECTRUM observed across formations RIGHT NOW (all real, one status call):
+- caught up: pf_notes/pf_property/sdktest-stream -> behind:false dropletsAhead:0 -> badge SILENT.
+- behind, idle: fdn-chat-sessions -> behind:true dropletsAhead:3 inflight:false -> "updating,
+  3 pending" (waiting for next pool window).
+- behind, actively pooling: pf_attachments -> behind:true dropletsAhead:50 inflight:true ->
+  "updating now, 50 pending" (pool running); sdktest-notes -> behind:true dropletsAhead:1
+  inflight:true after my write.
+
+FRESHNESS-BADGE COMPONENT SPEC (finalized from live data):
+  input: periscope_status row {behind, dropletsAhead, inflight, snapshotCursor, currentCursor}
+         + the formation's stream trigger cron (from formation describe: sdktest-notes/
+         vizzda-events = "*/5 * * * *").
+  render:
+    behind==false                         -> nothing (silent; charts are current).
+    behind==true && inflight==true        -> "Updating now - N latest included in ~<ETA>"
+    behind==true && inflight==false       -> "Updating - N pending, next refresh in ~<ETA>"
+  ETA = ms until the next cron boundary of the stream trigger. A client cron util computes it.
+  ALSO surface a note: "your latest entries are already live in the feed" (fresh index) so the
+  user never feels data loss while the CHART catches up.
+This badge is itself a teaching artifact -- it makes the eventual-consistency VISIBLE and
+reassuring, encoding the judgment: fresh index = instant; analytical chart = pooled + honest
+"updating ~Nm". Never name the engine; describe as "RainDB's auto-datalake refreshes your
+analytics every few minutes; your live data is always instant."
