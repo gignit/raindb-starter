@@ -454,3 +454,32 @@ entire history, instantly."
 
 CANDIDATE SDK GAP: db.writeDroplet with opts (idempotency/author/CAS). writeBatch
 covers it today; adjudicate whether a writeDroplet-with-opts is worth adding.
+
+## IDEMPOTENCY -- coder-verified correction (operator recollection reconciled)
+
+Operator recalled idempotency is formation-shaped. Reconciled against coder -- there
+are TWO distinct "dedup" concepts, don't conflate:
+
+1. WRITE-TIME idempotency (dedup a RETRIED write): a PER-CALL opts.IdempotencyKey
+   (pkg/sdk/write.go:359). The SDK checks+claims an idempotency POINTER keyed by
+   (tenant, formationId, key) via paths.IdempotencyPointerPath; repeat key = no-op
+   returning the existing write. Works on ANY formation -- no per-formation opt-in.
+   internal/ops/droplet.go:354 (IdempotencyKey) + token.go:23 both carry it.
+2. READ/SQL dedup (the FORMATION-shaped one the operator is thinking of):
+   views.defaultBehavior.dedup (tier_policy.go:709) = present the NEWEST revision per
+   logical entity in periscope. A VIEW concern, not write idempotency. And the
+   scopeKey defines entity identity. So the formation shape governs how revisions
+   collapse at the READ/datalake layer + how the entity is identified -- NOT the
+   write-retry pointer.
+
+RESOLUTION for Save Set: the PLATFORM supports single-write idempotency
+(write.go:359); the BOLT wrapper db.writeDroplet just drops the key ({formationId,
+payload} only, sdk_impl.go:497). So it's a bolt-SDK EXPOSURE gap, not a platform
+gap. Options: (a) use db.writeBatch(single item) which DOES expose per-item
+idempotency (native today), or (b) FILL the gap: db.writeDroplet with opts
+(idempotencyKey/author/expectedETag) -- the exercise's whole point is filling such
+gaps. LEAN (b): add writeDroplet opts to the bolt-sdk (adjudicate the host binding
+first -- sdk_impl.go WriteDroplet host signature), because every bolt author writing
+a retryable entity hits this. Verify the goja host WriteDroplet can carry opts before
+committing to (b); if the host is fixed-opts, (a) writeBatch is the answer + a noted
+future host gap.
