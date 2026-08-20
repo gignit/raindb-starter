@@ -839,3 +839,51 @@ relying on it (fallback: setId-as-identity, already noted).
    AI report, SQL charts, retroactive PR).
 Budget enforced; both pillars (entries=foundation, workouts=showcase, ONE shared persistence/
 feed/history/AI impl). Commit+push frequently. Adjudicated -- proceeding to build.
+
+## THE CORE TEACHING INSIGHT (operator -- corrects codex+me; eventual-consistency IS the superpower)
+
+codex+I framed "can't freshen an aggregate" as a limitation to engineer around. WRONG
+framing. The SMART design embraces eventual-consistency as the scale superpower and
+communicates it gracefully. The intelligence the starter must ENCODE (a picture worth
+a thousand words -- teach agents by example):
+
+TWO DISTINCT MERGE CASES (the real difference):
+1. ENTITY-ROW query (feed / list / "my recent entries" / crexp rolodex+properties): the
+   dataset shape IS the entity shape, so a late droplet is just another row -> merge it in
+   (project onto columns, prepend newest, dedupe by id). queryEntityRowsFresh is CORRECT
+   here. New properties/entries flow in trivially because the result is NOT a curated shape.
+2. AGGREGATE / CHART (GROUP BY, PERCENT_RANK, regr_slope, window): a CURATED COMPUTED shape
+   that is NOT the entity shape -> you CANNOT merge a raw late droplet into it. Do NOT try.
+
+THE SMART ANSWER for the aggregate/chart case (NOT a fresh-aggregate merge):
+- Render the chart from POOLED data -- instant, at ANY scale (THAT speed comes FROM the
+  eventual-consistency; it's why 20k==100M).
+- The freshness bookmark tells you there's newer un-pooled data (freshnessStatus:BEHIND,
+  periscope_status behind:true + dropletsAhead:N).
+- Show an honest reassuring "updating..." / "generating" indicator, and COUNT DOWN to the
+  next pool using periscope: the stream trigger.next cron ("*/5 * * * *" on vizzda-events =
+  every 5 min, coder-verified via periscope_formation_describe) is the cadence; next
+  cron boundary = the ETA. So "your latest workout appears in ~Nm."
+- MEANWHILE the FRESH path already covers "did it save + today's sets" INSTANTLY (O(1) grab
+  / session_fresh reads today from the by-update index). Nothing is lost -- the analytical
+  chart just trails one pool cycle, which is FINE because the user is told it's coming.
+
+So the seam is: fresh/O(1) index for "it saved + today"; pooled SQL for "chart my whole
+history at any scale"; a graceful "updating ~Nm" indicator (driven by the REAL freshness
+bookmark + periscope status cron, not a fake merge) for the gap. Eventual-consistency is
+NOT a negative -- it's the design that enables the scale, and being smart about WHAT to use
+WHEN is the superpower the starter must transfer.
+
+STARTER'S REAL JOB (reframed): not just USE raindb -- ENCODE THE JUDGMENT of which plane to
+use when/why so an agent reading it ABSORBS the discipline. The workout chart is the perfect
+teacher: chart from pooled SQL (labeled "full history, any scale") + an "updating ~Nm" badge
+when BEHIND + today's sets instant via the fresh index. queryEntityRowsFresh is used ONLY
+for the entity FEED (where the merge is correct, like crexp's new properties), NEVER forced
+onto the aggregate. This clarity in the example IS how we unleash agents on raindb's power.
+
+BUILD IMPACT: (a) queryEntityRowsFresh stays (feed/list only, fail-loud). (b) The AI report
++ charts do NOT attempt fresh aggregates -- they render pooled + show the freshness/countdown
+state + compose session_fresh for today. (c) NEW small client primitive: a "freshness badge"
+component driven by periscope_status (behind + dropletsAhead + next-pool ETA from the stream
+cron) -- reusable, and itself a teaching artifact. (d) A client util to compute the ETA from
+the stream trigger cron. Describe by capability; never name the engine.
