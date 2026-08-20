@@ -1373,3 +1373,19 @@ natural scope, verifies the ~b64 objects in raw S3, requires GraphQL semantic-sc
 both. Codex has a draft contract (tests/live/tests/droplet/test_list_scope.py) started.
 DECISION (lead): NON-BLOCKING for the app -- delegate the complete fix to codex as a dedicated live-
 contract-first task; versionHistory folds into the app when it lands. 5/6 M1 primitives proven. Proceed.
+
+## STANDING DIRECTIVE -- GIT/BRANCH CONTROL (operator, SACRED)
+I (lead) own ALL git handling: branches, checkouts, commits, merges, stashes, pushes. We
+share ONE machine + worktree, so branch churn from a peer corrupts the shared state (this
+already happened once -- codex left raindb-prime on its fix branch; cleanly consolidated).
+=> EVERY codex dispatch MUST include: "Do NOT run any git command -- no branch switch,
+checkout, commit, merge, stash, rebase, or push. Edit files + run tests ONLY. Leave the
+worktree on whatever branch it's on. I handle all git." Codex reports what it changed; I
+stage/commit/branch it. This is non-negotiable to keep the shared worktree sane.
+
+ONE-BRANCH-PER-REPO (never switch off these):
+- raindb-prime:      test/live-counter-token-contract  (draft+counter contracts + versionHistory fix e37e6ada, all merged)
+- raindb-bolt-sdk-ts: feat/files-graphql-fallback       (all SDK primitives + versionHistory + writeToken envelope fix)
+- raindb-starter:     uplift/2026-08                     (FitLedger app)
+All clean. codex's versionHistory host fix is DONE + deployed to prod (e37e6ada); probe
+bolts need a republish (pre-fix SDK embedded) to show versionHistory green -- redeploy only.
