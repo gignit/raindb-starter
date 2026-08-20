@@ -1,10 +1,23 @@
 {
   "raindb": {
     "formations": [
-      { "id": "starter-notes", "ops": ["read", "write", "list"] }
+      { "id": "ref-users", "ops": ["read", "write", "list"] },
+      { "id": "ref-session", "ops": ["read", "token-write", "list"] },
+      { "id": "ref-config", "ops": ["read", "token-write"] },
+      { "id": "ref-stats", "ops": ["read", "token-write", "mutate"] },
+      { "id": "ref-streaks", "ops": ["read", "token-write", "mutate"] },
+      { "id": "ref-entries", "ops": ["read", "write", "list"] },
+      { "id": "ref-journal", "ops": ["read", "write", "list"] },
+      { "id": "ref-journal-draft", "ops": ["read", "token-write"] },
+      { "id": "ref-tags", "ops": ["read", "token-write"] },
+      { "id": "ref-workout-categories", "ops": ["read", "write", "list"] },
+      { "id": "ref-workout-sets", "ops": ["read", "write", "list"] },
+      { "id": "ref-workout-session", "ops": ["read", "token-write"] },
+      { "id": "ref-photos", "ops": ["read", "write", "list"] }
     ],
     "secrets": {
       "names": [
+        "FL_SESSION_SECRET",
         "LLM_API_BASE",
         "LLM_API_KEY",
         "RAINDB_GRAPHQL_ENDPOINT",
@@ -13,9 +26,9 @@
     }
   },
   "network": {
-    "egress": ["api.rtest.raindb.io"],
+    "egress": ["api.raindb.io"],
     "fetch": {
-      "allowedHosts": ["api.rtest.raindb.io"]
+      "allowedHosts": ["api.raindb.io"]
     }
   },
   "limits": {
