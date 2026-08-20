@@ -46,16 +46,19 @@ export interface ChartPoint {
  */
 export async function categoryProgress(userId: string, categoryId: string, days = 90): Promise<{ points: ChartPoint[]; freshness: FreshnessState }> {
   const since = new Date(Date.now() - days * 86400000).toISOString();
+  // recordedAt is an ISO-8601 string that DuckDB binds as TIMESTAMP, so extract
+  // the day with a date cast (substr() would need a VARCHAR and errors on a
+  // TIMESTAMP). CAST(... AS DATE) gives a clean per-day bucket.
   const q = `
     SELECT
-      substr(recordedAt, 1, 10) AS day,
+      CAST(recordedAt AS DATE)  AS day,
       MAX(weightKg)             AS topWeightKg,
       SUM(weightKg * reps)      AS totalVolumeKg,
       COUNT(*)                  AS sets
     FROM entity."${SETS}"
     WHERE userId = '${userId.replace(/'/g, "")}'
       AND categoryId = '${categoryId.replace(/'/g, "")}'
-      AND recordedAt >= '${since}'
+      AND CAST(recordedAt AS DATE) >= CAST('${since}' AS DATE)
     GROUP BY day
     ORDER BY day`;
   const r = await sql.query({ sql: q, formationId: SETS, withFreshness: true });
