@@ -546,3 +546,51 @@ declare canonical columns" is WRONG about capability. Free-form metrics IS query
 This is the starter's deepest lesson: a formation is a typed table in an infinitely
 scalable analytical engine; the transport is simple, the analytics are limitless;
 freshness-merge keeps it current. Describe by CAPABILITY, never name the engine.
+
+## THE TWO POWER AXES (operator -- THE definitive scale model; corrects conflation)
+
+There are TWO INDEPENDENT superpowers. The social-media/Instagram/X scale story runs
+on AXIS 1, NOT on SQL. Do not conflate them.
+
+AXIS 1 -- the O(1) "GRAB" (the infinite-scale, never-refactor engine):
+Most social ops are DIRECT GRABS, not searches:
+- post / profile / image / comment = a droplet with an ID (images via float/public
+  float). Grab by ID = O(1) pointer read, at ANY scale.
+- a feed / thread / gallery = a CHAIN of contentIds fetched IN PARALLEL by ID (each
+  O(1)). 
+- infinite scroll = descIndex newest->oldest (or ascending from an ID) = O(pageSize)
+  at any scale via the reverse-index chain + opaque cursors.
+- likes / followers / counts = TOKENS doing real-time stats (mutate / mutateAndRead).
+  Coder-verified (pkg/sdk/token.go:1328): mutateAndRead is the FLEET-WIDE rate-limiter
+  primitive -- increments a counter and returns the FLEET-TRUE post-increment value in
+  ONE call (owner host authoritative; non-owners get it over the wire). Requires
+  lifecycle.autoCache:true. So a like/follower count is real-time + fleet-authoritative,
+  NO SQL, NO funnel. (Funnels exist but are NOT vetted -- PREFER TOKENS; don't lean on
+  funnels.)
+NONE of Axis 1 touches periscope/SQL. Read cost is independent of TOTAL data size
+because you address by ID, not scan. THIS is why you never refactor from personal-site
+to X-scale: the same droplets + pointer indexes + descIndex chains + token counters,
+O(1)/O(pageSize) at any size.
+
+AXIS 2 -- the analytical SQL engine (periscope): the SEPARATE superpower for genuine
+SEARCH / AGGREGATION / ANALYTICS across massive data (full engine -- window functions,
+regression, percentiles, JSON functions). Wrong tool for a feed grab. You DON'T need it
+for social-core ops at all. The docs' "common mistakes" hammer this: use periscope for
+broad analytical relationships, NOT as a substitute for a direct index on an interactive
+route.
+
+=> THE STARTER MUST TEACH BOTH AXES DISTINCTLY (don't conflate):
+- Ledger entries feed, version history, comments/reactions, workout SET logging +
+  "last set" prefill + infinite scroll = AXIS 1 grabs (pointer reads, descIndex,
+  token counters). Label them "instant at any scale, no analytics engine involved."
+- Workout charts + AI analytical report + cross-history PR/regression = AXIS 2
+  (periscope SQL). Label: "when you need analytics across your whole history, the same
+  droplets are a full analytical engine."
+The lesson for agents: GRAB with O(1) index/descIndex for interactive reads (infinitely
+scalable); reach for SQL ONLY for real analytics. Real-time counts = tokens
+(mutateAndRead), never funnels.
+
+This is the corrected scale thesis: RainDB scales like a social platform via O(1) grabs
++ token counters (Axis 1), AND gives you a full analytical engine for the rare analytical
+need (Axis 2) -- same data, zero refactor, ever. Describe by capability; never name the
+engine.
