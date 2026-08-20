@@ -115,9 +115,35 @@ function NotesPanel() {
 interface ChatLine {
   kind: "user" | "assistant" | "error";
   text: string;
-  /** For assistant turns: the agent's activity trace (thinking + tool calls),
-   *  shown in a collapsible section above the answer. */
-  trace?: string[];
+  /** For assistant turns: the agent's activity trace, built LIVE from the SSE
+   *  AgentEvent stream (nothing is persisted server-side -- the thinking is
+   *  shown straight from the frames as they arrive). Each step keeps the full
+   *  event detail so the UI can show what the agent actually did. */
+  trace?: TraceStep[];
+}
+
+// One rendered line of the live agent trace. Mirrors the @raindb/agent
+// AgentEvent shapes (thinking / tool-call / tool-result / tool-error) -- we
+// keep the tool name, args, result preview, timing, and ok flag so the trace
+// shows the real reasoning, not a terse label.
+interface TraceStep {
+  kind: "thinking" | "tool-call" | "tool-result" | "tool-error";
+  label: string;
+  detail?: string; // args (call) or result preview (result) or error text
+  ok?: boolean;
+  durationMs?: number;
+}
+
+/** Compact one-line JSON preview for tool args / results. */
+function preview(v: unknown, max = 300): string {
+  let s: string;
+  try {
+    s = typeof v === "string" ? v : JSON.stringify(v);
+  } catch {
+    s = String(v);
+  }
+  s = (s ?? "").replace(/\s+/g, " ").trim();
+  return s.length > max ? s.slice(0, max) + "..." : s;
 }
 
 function ChatPanel() {
@@ -137,9 +163,10 @@ function ChatPanel() {
     if (!message || busy) return;
     setInput("");
     setBusy(true);
-    // The live activity trace for THIS turn (thinking + tool calls), shown in
-    // a collapsible section and preserved on the finished assistant message.
-    const trace: string[] = [];
+    // The live activity trace for THIS turn, built straight from the streamed
+    // AgentEvents. Nothing is recorded server-side -- these frames arrive over
+    // SSE and we render them as they come.
+    const trace: TraceStep[] = [];
     setLines((ls) => [
       ...ls,
       { kind: "user", text: message },
@@ -155,15 +182,40 @@ function ChatPanel() {
         return next;
       });
 
+    // Each SSE frame is a full @raindb/agent AgentEvent -- keep its detail
+    // (tool name + args + result preview + timing) so the trace shows what the
+    // agent actually did, not just that "a tool was called".
     const onEvent = (ev: ChatEvent) => {
       if (ev.type === "thinking") {
-        trace.push(`thinking (step ${String(ev.iteration ?? "")})`.trim());
+        trace.push({ kind: "thinking", label: `Thinking (step ${String(ev.iteration ?? "")})`.trim() });
         patchLast({ trace: [...trace] });
       } else if (ev.type === "tool-call") {
-        trace.push(`tool call: ${String(ev.toolName)}`);
+        const args = (ev.args ?? {}) as unknown;
+        const hasArgs = args && typeof args === "object" && Object.keys(args as object).length > 0;
+        trace.push({
+          kind: "tool-call",
+          label: `Calling tool: ${String(ev.toolName)}`,
+          ...(hasArgs ? { detail: preview(args) } : {}),
+        });
         patchLast({ trace: [...trace] });
       } else if (ev.type === "tool-result") {
-        trace.push(`tool result: ${String(ev.toolName ?? "")}`.trim());
+        trace.push({
+          kind: "tool-result",
+          label: `Tool ${String(ev.toolName ?? "")} ${ev.ok === false ? "failed" : "returned"}`.trim(),
+          ok: ev.ok !== false,
+          ...(typeof ev.durationMs === "number" ? { durationMs: ev.durationMs } : {}),
+          ...(ev.preview !== undefined || ev.result !== undefined
+            ? { detail: preview(ev.preview ?? ev.result) }
+            : {}),
+        });
+        patchLast({ trace: [...trace] });
+      } else if (ev.type === "tool-error") {
+        trace.push({
+          kind: "tool-error",
+          label: `Tool ${String(ev.toolName ?? "")} error`.trim(),
+          ok: false,
+          detail: String(ev.error ?? ""),
+        });
         patchLast({ trace: [...trace] });
       } else if (ev.type === "final") {
         const content = String(ev.content ?? "");
@@ -207,7 +259,14 @@ function ChatPanel() {
                     </summary>
                     <ul className="thinking-steps">
                       {l.trace.map((t, j) => (
-                        <li key={j}>{t}</li>
+                        <li key={j} className={`trace-step ${t.kind}`}>
+                          <span className="trace-label">
+                            {t.ok === false ? "x " : ""}
+                            {t.label}
+                            {typeof t.durationMs === "number" ? ` (${t.durationMs}ms)` : ""}
+                          </span>
+                          {t.detail && <code className="trace-detail">{t.detail}</code>}
+                        </li>
                       ))}
                     </ul>
                   </details>

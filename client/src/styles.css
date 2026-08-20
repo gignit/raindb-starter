@@ -143,3 +143,27 @@ button:disabled { opacity: 0.5; cursor: default; }
   color: #8b98a5;
 }
 .thinking-steps li { margin: 2px 0; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* Structured trace steps: a label line + an optional detail (args / result
+   preview / error), colored by event kind so the reasoning reads at a glance. */
+.trace-step { list-style: none; display: flex; flex-direction: column; gap: 2px; margin: 4px 0; }
+.trace-step .trace-label { font-size: 12px; }
+.trace-step.thinking .trace-label { color: #8b98a5; }
+.trace-step.tool-call .trace-label { color: #6cb6ff; }
+.trace-step.tool-result .trace-label { color: #6bc46d; }
+.trace-step.tool-error .trace-label,
+.trace-step .trace-label:first-child:has(+ .trace-detail) { }
+.trace-step.tool-error .trace-label { color: #f47067; }
+.trace-detail {
+  display: block;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #0d1117;
+  border: 1px solid #2a2f3a;
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: #adbac7;
+  max-height: 8em;
+  overflow: auto;
+}
