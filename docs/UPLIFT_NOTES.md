@@ -396,3 +396,61 @@ categoryId + categoryPath + canonical columns (which they now do). So EITHER wor
 lean catalog for the tree ergonomics IF the catalog bolt binding is filled (it's a
 stub -- route via ctx.fetch graphql, real op names: catalogScopeValue/entry/refValue).
 Await claude, then decide catalog-vs-droplet with the canonical-columns fix locked.
+
+## CLAUDE REVIEW + FINAL WORKOUT DATA MODEL (both peers converged; I adjudicated the split)
+
+Both peers coder-confirmed the material corrections; they split on catalog-vs-droplet.
+FINAL LOCKED DESIGN:
+
+CATEGORIES = DROPLET formation ref-workout-categories (claude wins the split).
+Decisive: the category tree is read on EVERY screen (tap->prefill) = HIGH frequency,
+but the catalog bolt binding is a low-frequency STUB (catalog.ts:1-10) routed over
+graphql -- wrong frequency class. Droplets give: native db.* hot-path reads,
+tree = listKeys on by-parent (the O(pageSize) pattern the starter teaches), and
+category edits inherit the Ledger's VERSIONING/undo pillar (rename Bench Press ->
+it's a new revision). scopeKey categoryId, parentId field, indexes by-id + by-parent
+(pointer). metricSchema rides on the category payload (presenter, see below). No
+catalog primitive; no filling the catalog stub just to use it.
+
+SETS = DROPLET formation ref-workout-sets with a CANONICAL METRIC VOCABULARY as
+typed schema properties (the fix for the flattenDepth bug -- these become real SQL
+columns): weightKg, reps, distanceM, durationS, avgHeartRateBpm, elevationM, score,
+rpe (nullable superset). PLUS a free-form `metrics` JSON for user-defined EXTRAS
+(opaque to SQL, fine). Each category's metricSchema is a PRESENTER/SELECTOR over the
+canonical vocabulary (which fields, labels, units, chart hint, benchmarkable) -- NOT
+a type creator. Adding a genuinely new measurement = one schema-version bump (rare,
+explicit). Stamp metricsVersion (the category revision dropletId) + denormalized
+categoryId/categoryName/categoryPath on every set. NEVER name a metric ts/author/
+formationId/dropletId (schema_mapper silently drops envelope-shadowing props).
+Indexes (ALL in v1 -- gotcha #8): by-id, by-category (SINGLE pointer
+.../{{.categoryId}}/latest.json for prefill) + descIndex (history), by-benchmark +
+descIndex, by-update + descIndex. flattenDepth not needed for metrics (they're
+top-level typed columns now). tierPolicy for SQL. Validate Save Set server-side
+against the category's selector (deterministic-or-fail).
+
+SESSION = TOKEN formation ref-workout-session (lifecycle.autoCache:true). Holds the
+RESUME state (current exercise, ordinal, timers, nav). mutateAndRead (not mutate --
+drop-tolerant) for the authoritative ordinal, but mint setId UUIDv7 as the retry
+identity (a lost mutateAndRead response leaves the ordinal ambiguous). Finish writes
+a final session DROPLET (start/end, completed exercises, AI-report ref).
+
+SAVE SET idempotency: db.writeDroplet has NO idempotencyKey; use db.writeBatch
+(single item, per-item idempotency -- native, claude confirmed db.ts:140-164) OR
+setId-as-identity. Prefer writeBatch(single) so it's native + idempotent.
+
+AI REPORT = TWO-PLANE COMPOSITION (both peers' #1 risk). Custom tools, explicitly
+labeled: session_fresh (reads TODAY from by-update/listSince -- the just-finished
+workout) + history_sql (reads history from the analytical engine). One prompt:
+"compare this session against history." This is the BEST two-plane teaching moment
+in the app -- lean in. Never SQL-only (the just-finished workout isn't rolled up).
+
+KILLER SQL (described by CAPABILITY, engine NEVER named): retroactive PR detection
+(MAX OVER PARTITION BY categoryPath -- announces PRs the user never marked; benchmark
+button = intent metadata, SQL = truth), 1RM regression with DATED prediction
+(regr_slope per 8-week window -> "you hit 100kg on Oct 3"), deload/overtraining
+(lag() weekly sum(weight*reps), >30% drop / 3-week climb), behavioral splits
+(percentile_cont pace by day-of-week/time-of-day). "Full analytical SQL over your
+entire history, instantly."
+
+CANDIDATE SDK GAP: db.writeDroplet with opts (idempotency/author/CAS). writeBatch
+covers it today; adjudicate whether a writeDroplet-with-opts is worth adding.
