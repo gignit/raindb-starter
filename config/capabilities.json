@@ -1,5 +1,6 @@
 {
   "raindb": {
+    "sqlRead": true,
     "formations": [
       { "id": "ref-users", "ops": ["read", "write", "list"] },
       { "id": "ref-session", "ops": ["read", "token-write", "list"] },

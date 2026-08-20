@@ -59,15 +59,25 @@ export interface Odometer {
   journalEntries: number;
 }
 
-/** Read the live community odometer (counters.total.* folded by the platform). */
+/**
+ * Read the live community odometer. keepRunningTotals folds counters.delta.*
+ * into counters.total.* on a schedule, so at any instant the FLEET-TRUE count
+ * is total + the not-yet-folded delta. Reading total alone would trail every
+ * recent increment (the delta accumulates between folds); summing both makes
+ * the odometer feel live AND stay correct after a fold. This is how a
+ * running-total counter is meant to be read.
+ */
 export async function readOdometer(): Promise<Odometer> {
   const d = await db.readLatest({ formationId: STATS, indexId: "by-id", scopeValue: GLOBAL_STATS });
-  const total = ((d?.payload as { counters?: { total?: Record<string, number> } })?.counters?.total) ?? {};
+  const c = (d?.payload as { counters?: { total?: Record<string, number>; delta?: Record<string, number> } })?.counters ?? {};
+  const total = c.total ?? {};
+  const delta = c.delta ?? {};
+  const live = (k: string) => (total[k] ?? 0) + (delta[k] ?? 0);
   return {
-    workouts: total.workouts ?? 0,
-    sets: total.sets ?? 0,
-    volumeKg: total.volumeKg ?? 0,
-    journalEntries: total.journalEntries ?? 0,
+    workouts: live("workouts"),
+    sets: live("sets"),
+    volumeKg: live("volumeKg"),
+    journalEntries: live("journalEntries"),
   };
 }
 

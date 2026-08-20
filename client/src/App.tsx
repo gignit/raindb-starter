@@ -319,11 +319,14 @@ function ProgressTab() {
   const [prs, setPrs] = useState<api.PR[]>([]);
   const [fresh, setFresh] = useState<api.Freshness | null>(null);
   const [streak, setStreak] = useState<{ current: number; longest: number } | null>(null);
+  const [prErr, setPrErr] = useState("");
   const [report, setReport] = useState<string>("");
   const [reporting, setReporting] = useState(false);
 
   useEffect(() => {
-    api.personalRecords().then((r) => { setPrs(r.records); setFresh(r.freshness); }).catch(() => {});
+    // Surface analytics errors instead of silently showing "no PRs" -- a
+    // swallowed error hid a real bug (missing sqlRead capability) during dev.
+    api.personalRecords().then((r) => { setPrs(r.records); setFresh(r.freshness); }).catch((e) => setPrErr(e instanceof Error ? e.message : "could not load PRs"));
     api.streak().then(setStreak).catch(() => {});
   }, []);
 
@@ -341,6 +344,7 @@ function ProgressTab() {
     <div>
       {streak && <div className="streak">{streak.current}-day streak <span className="muted">(best {streak.longest})</span></div>}
       <div className="rowbetween"><h2>Personal records</h2>{fresh?.behind && <span className="badge">updating...</span>}</div>
+      {prErr && <div className="error">{prErr}</div>}
       <ul className="list">
         {prs.map((p) => (
           <li key={p.categoryId} className="listitem">
@@ -348,7 +352,7 @@ function ProgressTab() {
             <span>{p.topWeightKg ?? "-"} kg <span className="muted">(~{p.estimatedOneRepMaxKg ?? "-"} 1RM)</span></span>
           </li>
         ))}
-        {prs.length === 0 && <p className="muted">Log some benchmark sets to see PRs.</p>}
+        {!prErr && prs.length === 0 && <p className="muted">Log some benchmark sets to see PRs.</p>}
       </ul>
       <h2>AI coach</h2>
       <button className="btn primary" onClick={runReport} disabled={reporting}>{reporting ? "Thinking..." : "Get my progress report"}</button>
