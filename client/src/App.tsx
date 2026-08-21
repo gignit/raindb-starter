@@ -314,11 +314,14 @@ function ChatView() {
       });
 
     // Each SSE frame is a full @raindb/agent AgentEvent -- rendered live, nothing
-    // persisted server-side.
+    // persisted server-side. NOTE: the loop emits a `thinking` event at the top
+    // of EVERY iteration (before it knows if this turn will call a tool or just
+    // answer), and it carries no reasoning content -- so a bare `thinking` is
+    // just "iteration started", not real thought. We therefore only surface
+    // ACTIONS (tool calls + results); a turn that only answers shows no trace.
     const onEvent = (ev: ChatEvent) => {
       if (ev.type === "thinking") {
-        trace.push({ kind: "thinking", label: `Thinking (step ${String(ev.iteration ?? "")})`.trim() });
-        patchLast({ trace: [...trace] });
+        // intentionally ignored -- see note above (no reasoning payload).
       } else if (ev.type === "tool-call") {
         const args = (ev.args ?? {}) as unknown;
         const hasArgs = args && typeof args === "object" && Object.keys(args as object).length > 0;
@@ -362,7 +365,7 @@ function ChatView() {
           <h1>Assistant</h1>
           <p className="sub">
             An <code>@raindb/agent</code> loop that reads your notes through a tool. Its
-            thinking + tool calls stream live over SSE.
+            tool calls stream live over SSE as it works.
           </p>
         </div>
       </div>
@@ -386,9 +389,11 @@ function ChatView() {
                 {l.trace && l.trace.length > 0 && (
                   <details className="thinking" open={l.text === ""}>
                     <summary>
-                      {l.text === ""
-                        ? `thinking${".".repeat((l.trace.length % 3) + 1)}`
-                        : `thought process · ${l.trace.length} step${l.trace.length === 1 ? "" : "s"}`}
+                      {(() => {
+                        const tools = l.trace!.filter((t) => t.kind === "tool-call").length;
+                        const noun = `tool call${tools === 1 ? "" : "s"}`;
+                        return l.text === "" ? `working -- ${tools} ${noun}...` : `${tools} ${noun}`;
+                      })()}
                     </summary>
                     <ul className="thinking-steps">
                       {l.trace.map((t, j) => (
