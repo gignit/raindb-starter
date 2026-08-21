@@ -64,7 +64,7 @@ client/ (Vite+React+TS)  --/api/*-->  Lightning Bolt (server/, goja, esbuild bun
 ```
 
 ### Keep (these are good and on-pattern)
-- **`server/lib/persistence.ts`** -- the entire data layer, ~180 lines. The read/write/list
+- **`server/lib/persistence.ts`** -- the entire data layer. The read/write/list
   patterns, the `authorName` naming-gotcha handling, the UUIDv7 usage. Keep the shape.
 - **`server/index.ts`** dispatcher + **`server/ai/chat.ts`** agent-loop+SSE pattern. The
   SSE framing and `runAgent` wiring are correct and worth preserving.
@@ -185,7 +185,7 @@ grounded in the same RainDB/notes context (R1).
   about X, you wrote. Remember it, the Force does."). Implement via the existing
   `list_notes` tool / a small "recent note" read at session start.
 - Keep the agent **grounded** in the notes formation via tools (the current `list_notes`
-  pattern). Add tools only if they earn their ~20 lines.
+  pattern). Add tools only if they earn their keep.
 
 ### 5.4 Notes widget (R4)
 - Note cards: create + list + (keep) edit-as-new-revision. In starfield mode they can be a

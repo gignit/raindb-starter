@@ -18,21 +18,27 @@ to a deployed app, and the patterns to follow when you build on top.
    Lightning Bolt    <-- the app server. TypeScript bundled with esbuild,
    (server/)             run on the RainDB Lightning `goja` runtime
         |                (fast, sandboxed, clone-and-run anywhere).
-        |  db.* (@raindb/bolt-sdk)        runAgent (@raindb/agent)
-        v          |                             |
-   RainDB substrate:                             v
+        |  db.* + sql.* (@raindb/bolt-sdk)      runAgent (@raindb/agent)
+        v          |                                   |
+   RainDB substrate:                                   v
       - Formations  = your data model (declarative config + schema)
       - Droplets    = immutable writes (UUIDv7 = chronology)
-      - Indexes     = the joins (O(pageSize) reads at any scale)
-      - Periscope   = analytical SQL over the same data (auto-datalake)
+      - Indexes     = the fresh, O(pageSize) reads at any scale (db.*)
+      - Periscope   = analytical SQL over the SAME droplets (sql.*, auto-datalake)
       - /v1/*       = an OpenAI-compatible model surface (the AI's brain)
 ```
 
 This starter uses two RainDB SDKs: `@raindb/bolt-sdk` (the typed `db.*`
-data bindings) and `@raindb/agent` (the AI agent loop). It runs on the
-`goja` engine, so it clones and deploys on any RainDB environment with no
-admin-provisioned runtime -- no database, no ORM, no migrations. The
-substrate is the backend.
+data bindings AND the `sql.*` analytical plane) and `@raindb/agent` (the
+AI agent loop). It runs on the `goja` engine, so it clones and deploys on
+any RainDB environment with no admin-provisioned runtime -- no database,
+no ORM, no migrations. The substrate is the backend.
+
+The example app is three screens over ONE data model -- **Notes**
+(instant index reads/writes), an **Assistant** (the agent, grounded in
+your notes), and **Analytics** (Periscope SQL over the same droplets,
+with a live freshness indicator). Each screen demonstrates a distinct
+RainDB capability you build on.
 
 ## Why build on this
 
@@ -46,8 +52,9 @@ substrate is the backend.
 - **AI is built in.** The assistant in this template calls a real LLM
   through RainDB's own OpenAI-compatible surface, grounded in your
   app's data via agent tools. No third-party AI account.
-- **The whole backend is ~400 lines.** `server/lib/persistence.ts` is
-  the entire data layer. Read it in five minutes.
+- **The whole backend is small.** `server/lib/persistence.ts` is the
+  entire data layer -- index reads/writes and the SQL analytics, in one
+  readable file. Start there.
 
 ## Quick start
 
@@ -109,13 +116,13 @@ time).
 ## Repository map
 
 ```
-client/                 Vite + React + TS UI (notes board + AI chat)
+client/                 Vite + React + TS UI (Notes / Assistant / Analytics tabs)
   src/api.ts            the client's whole API surface (fetch + SSE consumption)
 server/
   index.ts              onHttpRequest -- the dispatcher (the backend's only door)
-  lib/persistence.ts    ALL RainDB IO, via typed db.* bindings -- READ THIS FIRST
+  lib/persistence.ts    ALL RainDB IO: db.* index reads/writes + sql.* analytics -- READ THIS FIRST
   lib/http.ts           request/response helpers
-  routes/notes.ts       the example CRUD surface via db.* (replace with your domain)
+  routes/notes.ts       CRUD via db.* + the /api/stats & /api/notes-sql SQL routes
   ai/chat.ts            the AI assistant: agent loop + custom tool + SSE streaming
 config/
   capabilities.json     what the bolt may touch (formations, secrets, network, limits)
@@ -130,27 +137,37 @@ AGENTS.md               the AI-agent operating manual -- patterns + recipes
 
 ## What the example app does
 
-A notes board with an AI assistant, over one data model:
+Three screens over one data model (the `starter-notes` formation),
+each exercising a different RainDB capability:
 
-- **Notes via `db.*`** (`@raindb/bolt-sdk`) are droplets in the
-  `starter-notes` formation. Create and edit produce NEW immutable
-  revisions; the `by-id` pointer index (keyed on the formation's `noteId`
-  scopeKey) always resolves the current one. Version history is free.
+- **Notes (`db.*`, the index plane).** Notes are droplets in
+  `starter-notes`. Create and edit produce NEW immutable revisions; the
+  `by-id` pointer index (keyed on the `noteId` scopeKey) always resolves
+  the current one -- instantly, at any scale. Version history is free.
   (`server/lib/persistence.ts`, `server/routes/notes.ts`.)
-- **The assistant** (`POST /api/chat`) is `@raindb/agent`'s `runAgent`
-  loop with one custom tool (`list_notes`) that reads the formation through
-  the same persistence layer. Progress streams to the browser as SSE frames
-  -- thinking, tool calls, final answer, live. The UI keeps each turn's
-  thinking trace in a collapsible section. (`server/ai/chat.ts`.)
-- **SQL for free**: the formation has a Periscope tier configured, so
-  once data flows you can `raindb-cli sql -c 'SELECT authorName, COUNT(*)
-  FROM entity."starter-notes" GROUP BY authorName'`.
+- **Assistant (`@raindb/agent`).** `POST /api/chat` runs `runAgent` with a
+  custom tool (`list_notes`) that reads the formation through the same
+  persistence layer. Each turn streams to the browser as SSE frames
+  (tool calls + results + the answer), shown live with a collapsible
+  activity trace. The model is called through RainDB's own
+  OpenAI-compatible surface. (`server/ai/chat.ts`.)
+- **Analytics (`sql.*`, the Periscope plane).** The SAME droplets are
+  queryable as an analytical SQL table -- no ETL, no second store.
+  `GET /api/stats` runs a `GROUP BY` aggregate and reports a **freshness**
+  verdict; the UI shows an honest "up to date" / "updating" badge.
+  `GET /api/notes-sql` uses `sql.queryEntityRowsFresh` to run SQL AND
+  merge the just-written tail (read-your-writes over the analytical
+  plane). (`statsByAuthor` + `recentNotesFresh` in
+  `server/lib/persistence.ts`.)
 
-**Two read planes (the freshness rule):** a `by-id` index read reflects a
-write immediately (use it for detail / read-after-write). Periscope SQL is
-eventually consistent -- the stream tier pools on a schedule (default ~5
-min), so a just-written row may not appear in a SQL query until it pools.
-That is by design; use the index for current state, SQL for analytics.
+**Two read planes (the freshness rule this app teaches):** a `by-id`
+index read reflects a write immediately -- use it for detail /
+read-after-write / current state. Periscope SQL is eventually consistent
+(the stream tier pools on a schedule, ~5 min), so a just-written row may
+not appear in an *aggregate* until it pools -- the Analytics badge makes
+that honest instead of hiding it. For a *row list* you can have both:
+`queryEntityRowsFresh` merges the fresh tail. Use the index for current
+state, SQL for analytics, and the merge for fresh feeds.
 
 Replace `starter-notes` with your domain entity and you have your app.
 
@@ -167,9 +184,12 @@ Replace `starter-notes` with your domain entity and you have your app.
   -- indexes, access tiers, feeds, SQL, floats, and every common
   mistake with its fix.
 - **Marketplace packs**: `raindb-cli pack list` -- prebuilt formation
-  sets for auth (`raindb/user-auth-email`), social, media, finance,
-  real estate, and the full document-RAG stack (`raindb/foundation`);
-  install any of them with `raindb-cli pack install <name>` and copy
+  sets for auth (`raindb/user-auth-email`), social (`raindb/social`),
+  media (`raindb/media-photos`, `raindb/media-secure-documents`),
+  finance (`raindb/finance-transactions`), real estate
+  (`raindb/real-estate-listings`), and the full document-RAG stack
+  (`raindb/foundation`); install any of them with
+  `raindb-cli pack install <name>` and copy
   their working formation configs.
 - **The SDK guides**: [@raindb/bolt-sdk](https://github.com/gignit/raindb-bolt-sdk-ts)
   (every binding: db, secrets, jwt, crypto, IAM, SSE) and

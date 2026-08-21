@@ -35,16 +35,21 @@ raindb-cli version || echo "ASK USER: install raindb-cli from https://raindb.io"
 
 # 1. Identity. register prompts for email + password (interactive --
 #    hand this to the user if you cannot answer prompts), login reuses
-#    an existing account.
-raindb-cli user register        # or: raindb-cli user login
-raindb-cli user whoami          # verify
+#    an existing account. No --portal/--endpoint needed: the CLI
+#    defaults to the production dashboard + API.
+raindb-cli user register --email <you> --name "<Name>"   # or: user login
+raindb-cli user whoami                                    # verify
 
-# 2. A group (the org that owns tenants) + a tenant (your app's home).
-raindb-cli group create <org-name>
-raindb-cli tenant create <app-name> --group <org-name>
-# tenant create WRITES A PROFILE into ~/.config/raindb-cli/{config,credentials}
-# named core.<env>.<app-name> and prints it. That profile carries the
-# endpoint + API key for everything below.
+# 2. A group (the org that owns tenants), then a tenant (your app's home)
+#    on a plan you choose from the live catalog.
+raindb-cli group create --name <org-name>
+raindb-cli plan list            # the subscription tiers; NAME is the slug,
+                                # pick one whose AVAILABLE is True
+raindb-cli tenant create --group <org-name> --name <app-name> --tier <slug>
+# --tier is REQUIRED (a tenant is always created on a plan). tenant create
+# WRITES A PROFILE into ~/.config/raindb-cli/{config,credentials} named
+# core.<env>.<app-name> and prints it. That profile carries the endpoint +
+# API key for everything below.
 
 # 3. Verify the profile works:
 raindb-cli --profile core.<env>.<app-name> formation list
@@ -189,7 +194,7 @@ The example domain is notes. Replacing it is mechanical:
 
 ```typescript
 // current version of entity X -- O(1) at any scale
-const d = await db.readLatest({ formationId, indexId: "by-id-latest", scopeValue: id });
+const d = await db.readLatest({ formationId, indexId: "by-id", scopeValue: id });
 
 // write -- payload MUST carry the formation's scopeKey
 await db.writeDroplet({ formationId, payload: { ...entity, [scopeKey]: id } });
@@ -218,7 +223,7 @@ raindb-cli --profile <p> sql -c 'SELECT author, COUNT(*) FROM entity."starter-no
 
 `server/ai/chat.ts` is the complete pattern: `runAgent` + a custom
 tool + SSE streaming. To give the model more abilities, add tools --
-each is ~20 lines. Rules that matter:
+each is a small self-contained definition. Rules that matter:
 
 - Tool results are JSON; errors return `{ error: "..." }` so the
   model can retry.
@@ -319,7 +324,7 @@ IAM section of the @raindb/bolt-sdk README
 
 | Resource | What it teaches |
 |---|---|
-| `server/lib/persistence.ts` (this repo) | The entire `db.*` data-access pattern, ~150 lines |
+| `server/lib/persistence.ts` (this repo) | The entire data-access layer: `db.*` index reads/writes + `sql.*` analytics |
 | `server/ai/chat.ts` (this repo) | The AI agent surface: `runAgent` + `makeBoltNativeHost` + a grounding tool, streamed over SSE |
 | github.com/gignit/joshua-vs-wopr | The canonical worked example: multi-game state, LLM opponent, session continuity, SSE everywhere |
 | github.com/gignit/raindb-bolt-sdk-ts | Every ctx binding: db, secrets, jwt, crypto, cookies, IAM, streaming, scheduling |
