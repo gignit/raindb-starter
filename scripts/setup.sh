@@ -121,11 +121,32 @@ if [ -z "$PROFILE" ]; then
 fi
 
 log "using profile: ${PROFILE}"
+# Verify the TENANT plane works (the rgr1.* key that publishes formations +
+# deploys). This is the one hard prerequisite; every step below is idempotent
+# (safe to re-run), so setup.sh doubles as a "reconcile to desired state" tool.
 raindb-cli --profile "$PROFILE" formation list >/dev/null 2>&1 \
   || die "profile '${PROFILE}' does not work (raindb-cli --profile ${PROFILE} formation list failed).
-         Check the name against ~/.config/raindb-cli/config, or re-run tenant create."
+         The profile is missing or its tenant key is invalid. Fix it with:
+           raindb-cli tenant create --group <org> --name <name> --tier <slug>   (creates + writes the profile)
+         or check the name against ~/.config/raindb-cli/config, then re-run this script.
+         (See ~/.local/share/raindb/RAINDB_GUIDE.md 'Getting set up'.)"
 
 [ -n "$BOLT_NAME" ] || BOLT_NAME="$(git -C "$REPO_DIR" config --local --get raindb.bolt-name 2>/dev/null || basename "$REPO_DIR")"
+
+# Idempotency preflight: report what is ALREADY in place so a re-run is
+# transparent (this is a reconcile, not a first-run-only script). None of this
+# gates; it just tells the operator/agent the current state before we (re)apply.
+log "preflight (idempotent -- re-running only reconciles what changed):"
+_have_bolt="$(raindb-cli --profile "$PROFILE" lightning bolt info "$BOLT_NAME" -o json 2>/dev/null \
+  | python3 -c "import sys,json; print('yes' if json.load(sys.stdin).get('payload') else 'no')" 2>/dev/null || echo no)"
+_n_formations="$(ls -1 "$REPO_DIR"/formations/*-config.json 2>/dev/null | wc -l | tr -d ' ')"
+log "  profile '${PROFILE}': OK (tenant key works)"
+log "  formations to publish: ${_n_formations} (publish is idempotent -- unchanged configs are a no-op)"
+if [ "$_have_bolt" = "yes" ]; then
+  log "  bolt '${BOLT_NAME}': already deployed -- this run will REDEPLOY it with the current source"
+else
+  log "  bolt '${BOLT_NAME}': not deployed yet -- this run will do the FIRST deploy"
+fi
 
 git -C "$REPO_DIR" config --local raindb.profile "$PROFILE"
 git -C "$REPO_DIR" config --local raindb.bolt-name "$BOLT_NAME"
