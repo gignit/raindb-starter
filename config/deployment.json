@@ -1,5 +1,5 @@
 {
-  "engine": "nodejs-20",
+  "engine": "goja",
   "runtimeLanguage": "javascript",
   "entrypoint": "dist/main.cjs",
   "mount": "/",

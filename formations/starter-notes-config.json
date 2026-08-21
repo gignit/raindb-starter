@@ -1,34 +1,36 @@
 {
   "configVersion": 1,
   "formationId": "starter-notes",
-  "pathTemplate": "tenants/{{.tenantId}}/entities/starter-notes/{{.noteId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
   "scopeKey": "noteId",
+  "autoGenId": true,
+  "pathTemplate": "entities/starter-notes/{{.noteId}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json",
   "minSchemaVersion": 1,
   "maxSchemaVersion": 1,
   "compatibleSchemas": ["v1"],
   "indexes": [
     {
-      "name": "by-id-latest",
-      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-id/{{.noteId}}/latest.json",
+      "name": "by-id",
+      "template": "indexes/starter-notes/by-id/{{.noteId}}/latest.json",
       "type": "pointer",
       "strategy": "write"
     },
     {
       "name": "by-author",
-      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-author/{{.authorName}}/{{.noteId}}/latest.json",
+      "template": "indexes/starter-notes/by-author/{{.authorName}}/{{.noteId}}/latest.json",
       "type": "pointer",
       "strategy": "write"
     },
     {
       "name": "by-update",
-      "template": "tenants/{{.tenantId}}/indexes/starter-notes/by-update/{{.dropletId}}/latest.json",
+      "template": "indexes/starter-notes/by-update/{{.dropletId}}/latest.json",
       "type": "pointer",
       "strategy": "write",
       "descIndex": {
         "enabled": true,
-        "entryTemplate": "tenants/{{.tenantId}}/indexes/starter-notes/by-update.desc/{{.dropletId}}/meta.json",
-        "latestPointerTemplate": "tenants/{{.tenantId}}/indexes/starter-notes/by-update.desc/latest.json",
-        "setsTemplate": "tenants/{{.tenantId}}/indexes/starter-notes/by-update.sets/{{.setId}}/meta.json"
+        "entryTemplate": "indexes/starter-notes/by-update.desc/{{.dropletId}}/meta.json",
+        "latestPointerTemplate": "indexes/starter-notes/by-update.desc/latest.json",
+        "setsTemplate": "indexes/starter-notes/by-update.sets/{{.setId}}/meta.json",
+        "carryFields": ["noteId", "authorName", "title"]
       }
     }
   ],
@@ -37,18 +39,32 @@
   ],
   "queryConfig": { "enabled": true, "flattenDepth": 1, "defaultLimit": 100, "maxLimit": 1000 },
   "tierPolicy": {
+    "partition": { "strategy": "formation" },
+    "catalog": { "location": "periscope/{{.formationId}}/catalog" },
+    "expiration": { "schedule": "daily", "snapshotRetention": "30d" },
     "tiers": {
       "stream": {
         "enabled": true,
         "source": { "type": "droplets", "index": "by-update" },
         "trigger": { "operator": "OR", "next": "*/5 * * * *", "tz": "UTC" },
-        "path": "tenants/{{.tenantId}}/periscope/{{.formationId}}/stream/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.poolId}}.parquet",
         "retainInputs": true,
         "retention": { "afterSupersession": "30d" }
+      },
+      "river": {
+        "enabled": true,
+        "source": { "type": "tier", "tier": "stream" },
+        "trigger": { "operator": "OR", "next": "0 */6 * * *", "tz": "UTC" },
+        "retainInputs": false,
+        "retention": { "afterSupersession": "30d" }
+      },
+      "lake": {
+        "enabled": true,
+        "source": { "type": "tier", "tier": "river" },
+        "trigger": { "operator": "OR", "next": "0 0 * * 0", "tz": "UTC" },
+        "retainInputs": false,
+        "retention": { "afterSupersession": "365d" }
       }
-    },
-    "partition": { "strategy": "formation" },
-    "catalog": { "location": "tenants/{{.tenantId}}/periscope/{{.formationId}}/catalog" }
+    }
   },
   "views": {
     "defaultBehavior": { "dedup": true },

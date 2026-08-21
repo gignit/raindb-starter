@@ -35,16 +35,21 @@ raindb-cli version || echo "ASK USER: install raindb-cli from https://raindb.io"
 
 # 1. Identity. register prompts for email + password (interactive --
 #    hand this to the user if you cannot answer prompts), login reuses
-#    an existing account.
-raindb-cli user register        # or: raindb-cli user login
-raindb-cli user whoami          # verify
+#    an existing account. No --portal/--endpoint needed: the CLI
+#    defaults to the production dashboard + API.
+raindb-cli user register --email <you> --name "<Name>"   # or: user login
+raindb-cli user whoami                                    # verify
 
-# 2. A group (the org that owns tenants) + a tenant (your app's home).
-raindb-cli group create <org-name>
-raindb-cli tenant create <app-name> --group <org-name>
-# tenant create WRITES A PROFILE into ~/.config/raindb-cli/{config,credentials}
-# named core.<env>.<app-name> and prints it. That profile carries the
-# endpoint + API key for everything below.
+# 2. A group (the org that owns tenants), then a tenant (your app's home)
+#    on a plan you choose from the live catalog.
+raindb-cli group create --name <org-name>
+raindb-cli plan list            # the subscription tiers; NAME is the slug,
+                                # pick one whose AVAILABLE is True
+raindb-cli tenant create --group <org-name> --name <app-name> --tier <slug>
+# --tier is REQUIRED (a tenant is always created on a plan). tenant create
+# WRITES A PROFILE into ~/.config/raindb-cli/{config,credentials} named
+# core.<env>.<app-name> and prints it. That profile carries the endpoint +
+# API key for everything below.
 
 # 3. Verify the profile works:
 raindb-cli --profile core.<env>.<app-name> formation list
@@ -78,69 +83,52 @@ message) -- curl the failing endpoint and read it. `ctx.log.*` lines go
 to the platform's log stream; there is no CLI log-tail verb today, so
 make your error responses informative.
 
-## The POD runtime: deploy & configure (READ before touching deploy config)
+## The runtime: deploy & configure (READ before touching deploy config)
 
-This starter runs on the **Lightning POD engine** (`nodejs-20`): real Node.js 20
-with native WebAssembly. That is what lets the 3rd SDK (`@raindb/prisma-adapter`)
-work -- Prisma 7 compiles queries with a WASM compiler the legacy `goja` engine
-cannot run. The notes + AI features also run on `goja`; Prisma needs the pod.
+This starter runs on the **`goja` engine** -- a fast, sandboxed JavaScript
+runtime that boots instantly and clones-and-runs on any RainDB environment
+(no admin-provisioned pod required). It uses two SDKs: `@raindb/bolt-sdk`
+(the native `ctx.db.*` data bindings) and `@raindb/agent` (the LLM agent
+loop). No ORM, no database process, no migrations -- the substrate is the
+backend.
 
-**Engine is selected by `config/deployment.json`, nothing else.** The exact pod
-fields (and why each is what it is):
+**Engine is selected by `config/deployment.json`, nothing else:**
 ```json
 {
-  "engine": "nodejs-20",          // selects the pod. MUST match an engine the host has.
+  "engine": "goja",
   "runtimeLanguage": "javascript",
   "entrypoint": "dist/main.cjs",  // MUST be .cjs: package.json is "type":"module",
-  "mount": "/",                   // so a .js bundle loads as ESM and the pod supervisor's
-  "healthcheck": "/api/health"    // require(entry).onHttpRequest returns {} -> dead bolt.
+  "mount": "/",                   // so a .js bundle would load as ESM and the
+  "healthcheck": "/api/health"    // runtime's require(entry).onHttpRequest export is lost.
 }
 ```
-- **Do NOT rename the bundle to `.js`.** The pod supervisor does
-  `require(entrypoint)`; with `"type":"module"` a `.js` is treated as ESM and the
-  handler export is lost. Keep esbuild's `outfile: dist/main.cjs`.
-- **`deploy.sh` passes `--entry dist/main.cjs`** -- the PREBUILT bundle. The CLI
-  re-esbuilds it, but since it is already a complete self-contained bundle (Prisma
-  WASM inlined), the re-bundle is idempotent. `npm run build` IS what ships. Keep
-  control of the bundle via `esbuild.config.mjs` (Prisma WASM handling is finicky).
-- **`prisma generate` MUST run before any build/deploy** (it is the first step of
-  `npm run build`): esbuild can only bundle the generated client if it exists.
+- **Do NOT rename the bundle to `.js`.** The runtime does `require(entrypoint)`
+  and reads `.onHttpRequest`; with `"type":"module"` a `.js` is treated as ESM
+  and the handler export is lost. Keep esbuild's `outfile: dist/main.cjs`.
+- **The platform re-bundles from `--source` with its own esbuild**, so
+  `deploy.sh` passes `--source server --entry index.ts` (the entry is RELATIVE
+  to the source dir, NOT the prebuilt `dist/`). `--client-dist` is joined onto
+  `--source`, so it is the relative hop (`../client/dist`).
 
-**Warm mode and memory are HOST settings, not bolt settings:**
-- The host runs `nodejs-20` **warm by default** (`ttlSeconds` in the host's
-  Private-tier `capabilities.pod.engines`): the pod boots once, Prisma's WASM
-  compiler inits once, then many requests reuse it (cold ~4-5s, warm ~0.4s),
-  idle-swept after the TTL. The bolt cannot set this; you benefit automatically
-  by keeping `getPrisma()` a lazy module-level singleton (see `server/lib/prisma.ts`).
-- The host enforces a **per-engine memory floor** (e.g. 1024MB for `nodejs-20`,
-  needed by Prisma). `config/capabilities.json` `limits.memoryMb` can only tighten
-  ABOVE the floor; set it to **1024** to match reality (a lower value is raised to
-  the floor anyway). A too-low limit is the classic Prisma OOM.
+**Secrets** are staged on the tenant and read at runtime via
+`ctx.secrets.get("NAME")` (over the host channel -- NOT env vars). Names must
+appear in `config/capabilities.json` `raindb.secrets.names`. The starter needs
+just the LLM pair for the AI assistant: `LLM_API_BASE` (`.../v1`) and
+`LLM_API_KEY`. `deploy.sh` stages them from `.<bolt>-secrets.json` via
+`--from-secrets` on the first deploy (the server-side publish gate requires
+declared secrets to exist -- a deploy without them fails). The notes + AI data
+IO does NOT use a key; it rides the capability-gated `ctx.db.*` bindings.
 
-**Secrets** are staged on the tenant and read at runtime via `ctx.secrets.get("NAME")`
-(over the host channel -- NOT env vars). Names must appear in
-`config/capabilities.json` `raindb.secrets.names`. The starter needs:
-`LLM_API_KEY`, `LLM_API_BASE` (`.../v1`), `RAINDB_GRAPHQL_ENDPOINT` (`.../graphql`),
-`RAINDB_GRAPHQL_KEY`. Stage with `raindb-cli --profile <p> lightning secrets set ...`.
-
-**Prerequisite (the "clone and deploy" caveat):** `capabilities.pod.engines` is
-platform/admin-managed (Private tier). A tenant does NOT self-enable the pod engine
--- you just set `engine: nodejs-20` and deploy, and it works **only if your
-environment's Lightning hosts have `nodejs-20` registered** (rtest today). If they
-don't, the bolt won't start. Enabling pod on a new environment is host-side admin
-work, not a tenant flow.
-
-**Consistency model (matters for the Prisma surface):** `findUnique`/`findFirst`
-by id read the **resolution plane** -- immediate, authoritative. `findMany`/`count`/
-aggregates read the **Periscope columnar plane**, which is **eventually consistent**
-(the stream tier pools on a schedule, default `*/5 * * * *`). A just-written row is
-instant via `findUnique` but lags in `findMany` until the pool runs. This is by
-design today (the host instant-merge overlay is deferred). For read-your-writes on
-one record, read it by id. The formation's `by-update` index + descIndex feed are
-required for the adapter's freshness path and are already configured in
-`formations/starter-notes-config.json` -- model new entities on it (see the canonical
-`crexp/vizzda-events` formation: `by-update` is a pointer WITH a `descIndex` block,
-and `tierPolicy.<tier>.source.index` points at `by-update`).
+**The two read planes (the #1 freshness rule):** an index read
+(`db.readLatest` by `by-id`) is **strongly consistent and fresh immediately**
+after a write -- use it for detail/read-after-write. Periscope **SQL** (`ctx.sql`,
+gated by `capabilities.raindb.sqlRead: true`) is **eventually consistent** (the
+stream tier pools on a schedule, default `*/5 * * * *`), so an empty SQL result
+right after a write means "not pooled yet," not "lost." Use SQL for
+analytics/aggregation; use the index for current state. The formation's
+`by-update` pointer + descIndex is the feed AND the periscope source (see
+`formations/starter-notes-config.json`; the canonical shape is
+`crexp/vizzda-events`).
 
 ## Read the patterns guide before designing formations
 
@@ -169,13 +157,14 @@ The example domain is notes. Replacing it is mechanical:
 1. **Design the formation(s).** Copy
    `formations/starter-notes-config.json` + `-schema.json` to
    `formations/<entity>-config.json` + `-schema.json`. Change:
-   - `formationId`, the `pathTemplate` (keep the
-     `tenants/{{.tenantId}}/entities/<entity>/...` shape),
+   - `formationId`, the `pathTemplate` (tenant-RELATIVE:
+     `entities/<entity>/{{.<scopeKey>}}/{{.yyyy}}/{{.mm}}/{{.dd}}/{{.dropletId}}.json`
+     -- never prefix with `tenants/`; the platform owns tenant isolation),
    - `scopeKey` (the payload field that identifies the entity),
-    - the indexes (one `by-id-latest` pointer; add one per access
-      pattern: `by-<field>` for "list X by field"; KEEP the `by-update`
+    - the indexes (one `by-id` pointer keyed on the `scopeKey`; add one per
+      access pattern: `by-<field>` for "list X by field"; KEEP the `by-update`
       pointer + descIndex feed and the `tierPolicy` source pointing at it
-      -- the Prisma adapter's freshness path needs it),
+      -- that is the newest-first feed AND the periscope SQL source),
     - the schema's required fields.
     Before designing anything complex, check the marketplace first:
     `raindb-cli pack list` -- auth, social, media, finance, listings
@@ -205,7 +194,7 @@ The example domain is notes. Replacing it is mechanical:
 
 ```typescript
 // current version of entity X -- O(1) at any scale
-const d = await db.readLatest({ formationId, indexId: "by-id-latest", scopeValue: id });
+const d = await db.readLatest({ formationId, indexId: "by-id", scopeValue: id });
 
 // write -- payload MUST carry the formation's scopeKey
 await db.writeDroplet({ formationId, payload: { ...entity, [scopeKey]: id } });
@@ -234,7 +223,7 @@ raindb-cli --profile <p> sql -c 'SELECT author, COUNT(*) FROM entity."starter-no
 
 `server/ai/chat.ts` is the complete pattern: `runAgent` + a custom
 tool + SSE streaming. To give the model more abilities, add tools --
-each is ~20 lines. Rules that matter:
+each is a small self-contained definition. Rules that matter:
 
 - Tool results are JSON; errors return `{ error: "..." }` so the
   model can retry.
@@ -303,17 +292,19 @@ IAM section of the @raindb/bolt-sdk README
      loads it as ESM and `.onHttpRequest` comes back undefined -> the bolt
      answers nothing. esbuild outputs `dist/main.cjs`; `deployment.json`
      `entrypoint` + `deploy.sh --entry` both say `dist/main.cjs`. Keep them so.
-12. **`prisma generate` before every build/deploy.** It is the first step of
-     `npm run build`. esbuild bundles the GENERATED client (with its inlined
-     WASM); if it was never generated, the bundle has no Prisma and the pod
-     `findMany`/`create` calls fail at import. The generated client lives in
-     `prisma/generated/` (gitignored -- it is a build artifact).
-13. **Prisma `findMany` is eventually consistent; `findUnique` is not.**
-     `findUnique`/`findFirst` by id hit the resolution plane (instant). `findMany`/
-     `count` hit Periscope (pools ~every 5 min), so a row you just wrote may not
-     appear in `findMany` immediately. Not a bug -- read single records by id for
-     read-your-writes. The `by-update` index + descIndex feed in the formation are
-     what the adapter's freshness path uses; keep them when you model new entities.
+12. **`by-id` is the pointer index keyed on the formation's `scopeKey`.**
+     Read the current revision with `db.readLatest({formationId, indexId:"by-id",
+     scopeValue})`. Add a secondary index only for a real alternate access path
+     (`by-author` to list a author's notes, `by-update`+descIndex for the feed).
+     Do not reflexively add an index per field -- denormalize deliberate read
+     keys onto the payload instead.
+13. **Index reads are fresh; SQL is eventually consistent.** A `by-id` read
+     reflects a write instantly; Periscope SQL (`ctx.sql`, gated by
+     `capabilities.raindb.sqlRead:true`) pools ~every 5 min, so a row you just
+     wrote may not appear in a SQL query immediately. Not a bug -- read single
+     records by id for read-your-writes; use SQL for analytics. The `by-update`
+     index + descIndex feed is the newest-first feed AND the periscope source;
+     keep it when you model new entities.
 
 ## Conventions for agents working in this repo
 
@@ -333,11 +324,10 @@ IAM section of the @raindb/bolt-sdk README
 
 | Resource | What it teaches |
 |---|---|
-| `server/lib/persistence.ts` (this repo) | The entire `db.*` data-access pattern, ~150 lines |
-| `server/lib/prisma.ts` + `prisma/schema.prisma` (this repo) | The Prisma surface (SDK #3): PrismaClient on RainDB, one model two surfaces |
+| `server/lib/persistence.ts` (this repo) | The entire data-access layer: `db.*` index reads/writes + `sql.*` analytics |
+| `server/ai/chat.ts` (this repo) | The AI agent surface: `runAgent` + `makeBoltNativeHost` + a grounding tool, streamed over SSE |
 | github.com/gignit/joshua-vs-wopr | The canonical worked example: multi-game state, LLM opponent, session continuity, SSE everywhere |
 | github.com/gignit/raindb-bolt-sdk-ts | Every ctx binding: db, secrets, jwt, crypto, cookies, IAM, streaming, scheduling |
 | github.com/gignit/raindb-agent-ts | The agent loop, the full tool catalog, tool authoring rules |
-| github.com/gignit/raindb-prisma | The Prisma adapter: resolution-plane reads, Periscope SQL, droplet writes, the generator |
 | `raindb-cli pack list` | Prebuilt formation packs: auth, social, media, finance, RAG |
 | `raindb-cli pack info raindb/guide-patterns` | The design-patterns guide -- read before designing a complex formation |

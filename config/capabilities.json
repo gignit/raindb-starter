@@ -1,21 +1,20 @@
 {
   "raindb": {
+    "sqlRead": true,
     "formations": [
       { "id": "starter-notes", "ops": ["read", "write", "list"] }
     ],
     "secrets": {
       "names": [
         "LLM_API_BASE",
-        "LLM_API_KEY",
-        "RAINDB_GRAPHQL_ENDPOINT",
-        "RAINDB_GRAPHQL_KEY"
+        "LLM_API_KEY"
       ]
     }
   },
   "network": {
-    "egress": ["api.rtest.raindb.io"],
+    "egress": ["api.raindb.io"],
     "fetch": {
-      "allowedHosts": ["api.rtest.raindb.io"]
+      "allowedHosts": ["api.raindb.io"]
     }
   },
   "limits": {

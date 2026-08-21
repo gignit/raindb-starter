@@ -19,13 +19,9 @@ import {
   handleCreateNote,
   handleGetNote,
   handleUpdateNote,
+  handleStats,
+  handleRecentNotesSql,
 } from "./routes/notes.js";
-import {
-  handlePrismaCreateNote,
-  handlePrismaGetNote,
-  handlePrismaListNotes,
-} from "./routes/prisma-notes.js";
-import { handlePodInfo } from "./routes/pod-info.js";
 
 export async function onHttpRequest(
   ctx: BoltContext,
@@ -43,22 +39,17 @@ export async function onHttpRequest(
       return ok({ status: "ok", service: "raindb-starter", ts: new Date().toISOString() });
     }
 
-    // Certification probe: runtime facts + 3-SDK status + live Prisma round-trip.
-    if (method === "GET" && path === "/api/pod-info") return await handlePodInfo(ctx);
-
-    // Streaming AI route (SSE) -- SDK #2 (@raindb/agent).
+    // Streaming AI route (SSE) -- @raindb/agent over the same starter-notes data.
     if (method === "POST" && path === "/api/chat") {
       return await handleChat(ctx, req);
     }
 
-    // Prisma surface -- SDK #3 (@raindb/prisma-adapter), SAME starter-notes data.
-    // (Order matters: the more-specific /api/prisma/* prefix is checked before
-    // the bare /api/notes routes below.)
-    if (method === "POST" && path === "/api/prisma/notes") return await handlePrismaCreateNote(ctx, req);
-    if (method === "GET" && path === "/api/prisma/notes") return await handlePrismaListNotes(ctx, req);
-    if (method === "GET" && path.startsWith("/api/prisma/notes/")) return await handlePrismaGetNote(ctx, req);
+    // Analytical SQL routes -- Periscope over the SAME droplets (AXIS 2).
+    // (Checked before the /api/notes/* prefix so they don't get shadowed.)
+    if (method === "GET" && path === "/api/stats") return await handleStats(req);
+    if (method === "GET" && path === "/api/notes-sql") return await handleRecentNotesSql(req);
 
-    // Sync CRUD routes -- SDK #1 (@raindb/bolt-sdk) raw db.* bindings.
+    // CRUD routes -- @raindb/bolt-sdk db.* bindings (AXIS 1: index reads).
     if (method === "GET" && path === "/api/notes") return await handleListNotes(req);
     if (method === "POST" && path === "/api/notes") return await handleCreateNote(req);
     if (method === "GET" && path.startsWith("/api/notes/")) return await handleGetNote(req);
