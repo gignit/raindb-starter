@@ -64,30 +64,47 @@ cd my-app
 rm -rf .git && git init && git add -A && git commit -m "raindb-starter"
 
 # 2. Create your RainDB identity + a tenant (writes a local profile)
-raindb-cli user register                 # or: raindb-cli user login
-raindb-cli group create my-org
-raindb-cli tenant create my-app --group my-org
+raindb-cli user register --email you@example.com --name "You"   # or: user login
+raindb-cli group create --name my-org
+raindb-cli plan list                     # the tiers; NAME is the slug to pass
+                                         # to --tier (pick one AVAILABLE=True)
+raindb-cli tenant create --group my-org --name my-app --tier <slug>
 #    -> prints + saves a profile named core.<env>.my-app
 
-# 3. One-command setup: publishes formations, stages secrets,
-#    deploys the bolt, installs the auto-deploy hook
+# 3. One-command setup: publishes formations, stages secrets, deploys
+#    the bolt, records its URL, and installs the server auto-deploy hook
 scripts/setup.sh --profile core.<env>.my-app
 
-# 4. Develop
+# 4. Develop against the LIVE bolt with hot reload
 cd client && npm install && npm run dev
-#    http://localhost:5173 -- /api proxies to your LIVE deployed bolt
+#    http://localhost:5173 -- /api proxies to your deployed bolt
 ```
 
 ## The development model
 
-You never simulate RainDB locally. Standing up a real tenant is three
-CLI commands, so there is nothing to mock -- and a mock would only
-force a refactor when you went live.
+You never simulate RainDB locally -- standing up a real tenant is a few
+CLI commands, so there is nothing to mock (and a mock would only force a
+refactor when you went live). After `scripts/setup.sh` deploys the bolt
+once, the loop is:
+
+1. **Iterate on the UI against the live bolt** -- `cd client && npm run
+   dev` runs the client on `localhost:5173` with instant hot-reload and
+   proxies every `/api/*` call to your **deployed bolt**. You always
+   develop against the real backend.
+2. **Server changes ship on commit** -- a commit that touches `server/`,
+   `formations/`, or `config/` triggers a background server build + deploy
+   (the post-commit hook `setup.sh` installs). A failed build does NOT
+   deploy; the commit still stands. Watch `.deploy.log`.
+3. **Ship the client when the UI is ready** -- `npm run deploy:client`.
+
+Prefer one explicit command for the whole bolt? `npm run deploy` builds
+and redeploys server + client together (what `setup.sh` runs the first
+time).
 
 | Layer | Inner loop | Deploys |
 |---|---|---|
-| **Client** (Vite + React) | `npm run dev` -- instant HMR, talks to the live bolt | **Manually**, when the UI is ready: `npm run deploy:client` |
-| **Server** (the bolt) | edit -> `git commit` | **Automatically** on every commit that touches `server/`, `formations/`, or `config/` (post-commit hook; failed builds do not deploy -- watch `.deploy.log`) |
+| **Client** (Vite + React) | `npm run dev` -- instant HMR, talks to the live bolt | Manually when ready: `npm run deploy:client` |
+| **Server** (the bolt) | edit -> `git commit` | Automatically on commits touching `server/`/`formations/`/`config/` (post-commit hook; failed builds do not deploy -- watch `.deploy.log`) |
 
 ## Repository map
 

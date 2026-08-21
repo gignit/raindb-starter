@@ -33,9 +33,11 @@
 #    the whole chain and writes a local PROFILE you then pass to this
 #    script:
 #
-#       raindb-cli user register          # or: raindb-cli user login
-#       raindb-cli group create <org>     # your organisation
-#       raindb-cli tenant create <name> --group <org>
+#       raindb-cli user register --email <you> --name "<Name>"   # or: user login
+#       raindb-cli group create --name <org>       # an org to own the tenant
+#       raindb-cli plan list                       # the tiers; NAME is the slug,
+#                                                  # pick one AVAILABLE=True
+#       raindb-cli tenant create --group <org> --name <name> --tier <slug>
 #
 #    `tenant create` AUTO-WRITES a profile section into
 #    ~/.config/raindb-cli/{config,credentials} named core.<env>.<name> and
@@ -111,9 +113,10 @@ if [ -z "$PROFILE" ]; then
         scripts/setup.sh --profile <profile-name>
 
       If you have not created a tenant yet, do this first:
-        raindb-cli user register
-        raindb-cli group create <org>
-        raindb-cli tenant create <name> --group <org>
+        raindb-cli user register --email <you> --name \"<Name>\"   # or: user login
+        raindb-cli group create --name <org>
+        raindb-cli plan list                       # pick a --tier slug (AVAILABLE=True)
+        raindb-cli tenant create --group <org> --name <name> --tier <slug>
       then pass the printed profile name (core.<env>.<name>) as --profile."
 fi
 
@@ -207,31 +210,73 @@ log "installing post-commit deploy hook at ${HOOK}"
 cat > "$HOOK" <<'HOOK_EOF'
 #!/usr/bin/env bash
 # raindb-starter post-commit hook (installed by scripts/setup.sh).
-# Auto-deploys the SERVER when the commit touched server-side files
-# (server/, formations/, config/, package.json, esbuild config). The
-# client is deliberately NOT auto-deployed -- use `npm run deploy:client`.
+# Deploys the SERVER when the commit touched server-side files (server/,
+# formations/, config/, package.json, esbuild/tsconfig). The client is
+# deliberately NOT auto-deployed -- ship it with `npm run deploy:client`.
+#
+# It runs the deploy in the FOREGROUND and reports the real outcome: on
+# failure it prints the deploy error and exits non-zero, so you (or your
+# agent) cannot miss a broken deploy. A failed deploy does NOT undo the
+# commit -- fix and commit again.
 set -uo pipefail
 REPO_DIR="$(git rev-parse --show-toplevel)"
 PROFILE="$(git config --local --get raindb.profile || true)"
+
+# A commit with no configured profile means the app was never set up. Do
+# NOT skip silently -- tell the human/agent exactly how to get a working
+# RainDB account + tenant + profile, then re-run setup.
 if [ -z "$PROFILE" ]; then
-  echo "[post-commit] no raindb.profile in .git/config; skipping deploy."
-  exit 0
+  cat >&2 <<'MSG'
+[post-commit] STOP: this repo has no RainDB profile, so the bolt cannot deploy.
+
+You need a RainDB account + a tenant, then a local profile pointing at it.
+
+  From zero (CLI only -- an agent can run these):
+    raindb-cli user register --email <you> --name "<Name>"   # or: user login
+    raindb-cli group create --name <org>       # an org to own the tenant
+    raindb-cli plan list                       # the tiers; NAME is the slug,
+                                               # pick one whose AVAILABLE is True
+    raindb-cli tenant create --group <org> --name <name> --tier <slug>
+                                               # provisions the tenant AND writes +
+                                               # prints a profile core.<env>.<name>
+  Then finish setup (publishes formations, stages secrets, deploys, installs this hook):
+    scripts/setup.sh --profile core.<env>.<name>
+
+  Already have a tenant (e.g. from the raindb.io onboarding page)?
+    raindb-cli profile setup --name <p> --token <bootstrap-key> \
+      --api-url <api-url> --tenant-id <id> --realm-id <realm> --region <region>
+    scripts/setup.sh --profile <p>
+
+Docs: ~/.local/share/raindb/RAINDB_GUIDE.md  (section "Getting set up")
+MSG
+  exit 1
 fi
-# Did this commit touch the server side?
+
+# Did this commit touch the server side? (Client-only/doc-only commits do
+# not deploy -- that is intended, not a silent failure.)
 if ! git diff-tree --no-commit-id --name-only -r HEAD \
     | grep -qE '^(server/|formations/|config/|package\.json|esbuild\.config\.mjs|tsconfig\.json)'; then
-  echo "[post-commit] no server-side changes; skipping deploy (client ships via npm run deploy:client)."
+  echo "[post-commit] no server-side changes in this commit; nothing to deploy (ship the client with: npm run deploy:client)."
   exit 0
 fi
-echo "[post-commit] server changed -> building + deploying (profile ${PROFILE}); log: ${REPO_DIR}/.deploy.log"
-( RAINDB_PROFILE="$PROFILE" bash "${REPO_DIR}/scripts/deploy.sh" --server \
-    > "${REPO_DIR}/.deploy.log" 2>&1 \
-  && echo "[post-commit] deploy OK ($(date -u +%H:%M:%S))" >> "${REPO_DIR}/.deploy.log" \
-  || echo "[post-commit] BUILD/DEPLOY FAILED -- see ${REPO_DIR}/.deploy.log (commit still stands)" >> "${REPO_DIR}/.deploy.log" ) &
-exit 0
+
+echo "[post-commit] server changed -> building + deploying (profile ${PROFILE})"
+echo "[post-commit] full log: ${REPO_DIR}/.deploy.log"
+# Foreground: tee to the log AND the terminal, and capture the deploy's
+# real exit code (PIPESTATUS[0], not tee's).
+set -o pipefail
+RAINDB_PROFILE="$PROFILE" bash "${REPO_DIR}/scripts/deploy.sh" --server 2>&1 | tee "${REPO_DIR}/.deploy.log"
+RC=${PIPESTATUS[0]}
+if [ "$RC" -eq 0 ]; then
+  echo "[post-commit] deploy OK ($(date -u +%H:%M:%S))"
+  exit 0
+fi
+echo "[post-commit] DEPLOY FAILED (exit ${RC}) -- the error is above and in ${REPO_DIR}/.deploy.log." >&2
+echo "[post-commit] Your commit still stands; fix the error and commit again (or run: npm run deploy)." >&2
+exit "$RC"
 HOOK_EOF
 chmod +x "$HOOK"
-log "post-commit hook installed."
+log "post-commit hook installed (foreground deploy, hard-fails on missing profile / deploy error)."
 
 # ----------------------------------------------------------------------------
 # DONE
